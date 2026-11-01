@@ -12,19 +12,11 @@ on:
 permissions:
   contents: read
 
-env:
-  ORG_GRADLE_PROJECT_strangeEonsDir: strange-eons
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # The script API is not published; it is built from this checkout.
-      - uses: actions/checkout@v7
-        with:
-          repository: strange-eons/strange-eons
-          path: strange-eons
       - uses: actions/setup-java@v6
         with:
           distribution: temurin

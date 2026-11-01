@@ -16,9 +16,8 @@ with a missing `script-language`, for Strange Rhino.
 
 ## Status
 
-Pre-release. Depends on the unreleased script-language SPI in
-[christophercurrie/strange-eons](https://github.com/christophercurrie/strange-eons)
-(module `strange-eons-script-api`).
+Pre-release. Depends on the unreleased script-language SPI,
+`org.strangeeons:strange-eons-script-api`, published as a snapshot.
 
 - `org.strangeeons.graaljs.GraalJSLanguage` — `ScriptLanguage` with id
   `ecmascript` (display name "JavaScript"), extension `.mjs`.
@@ -77,10 +76,7 @@ The host resolves the same lifecycle names as for Rhino plug-ins
 
 ## Build
 
-Requires JDK 25 and a checkout of `christophercurrie/strange-eons` that
-contains `strange-eons-script-api`. The SPI is not published to any
-repository; it is built from that checkout through a Gradle composite build.
-By default the checkout is expected at `../strange-eons`:
+Requires JDK 25. The SPI resolves from the Central Portal snapshot repository:
 
 ```
 ./gradlew test          # unit tests against GraalJS on the classpath
@@ -88,9 +84,6 @@ By default the checkout is expected at `../strange-eons`:
 ./gradlew check         # both
 ./gradlew sePlugin      # build build/libs/GraalJSLanguage.selibrary
 ```
-
-Point at a different checkout with `-PstrangeEonsDir=/path/to/strange-eons`
-or set `strangeEonsDir` in `~/.gradle/gradle.properties`.
 
 ## Install
 

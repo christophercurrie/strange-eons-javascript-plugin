@@ -15,6 +15,10 @@ java {
 
 repositories {
     mavenCentral()
+    maven("https://central.sonatype.com/repository/maven-snapshots/") {
+        mavenContent { snapshotsOnly() }
+        content { includeGroup("org.strangeeons") }
+    }
 }
 
 // GraalVM 25.0.x is the LTS line. GraalVM's documented coordinate is the
@@ -22,11 +26,12 @@ repositories {
 // org.graalvm.js:js (also POM-only) -> js-language + truffle-runtime. Shadow
 // tries to unzip POM artifacts, so depend on the two real jars directly.
 val graalVersion = "25.0.5"
+val scriptApiVersion = "3.6.0-SNAPSHOT"
 
 dependencies {
-    // Provided by Strange Eons at runtime; resolved from the composite build.
-    compileOnly("org.strangeeons:strange-eons-script-api")
-    testImplementation("org.strangeeons:strange-eons-script-api")
+    // Provided by Strange Eons at runtime.
+    compileOnly("org.strangeeons:strange-eons-script-api:$scriptApiVersion")
+    testImplementation("org.strangeeons:strange-eons-script-api:$scriptApiVersion")
 
     implementation("org.graalvm.polyglot:polyglot:$graalVersion")
     implementation("org.graalvm.js:js-language:$graalVersion")
@@ -90,7 +95,7 @@ val bundleTest by sourceSets.creating {
 }
 
 dependencies {
-    "bundleTestImplementation"("org.strangeeons:strange-eons-script-api")
+    "bundleTestImplementation"("org.strangeeons:strange-eons-script-api:$scriptApiVersion")
     "bundleTestImplementation"(platform("org.junit:junit-bom:5.10.2"))
     "bundleTestImplementation"("org.junit.jupiter:junit-jupiter")
     "bundleTestRuntimeOnly"("org.junit.platform:junit-platform-launcher")
