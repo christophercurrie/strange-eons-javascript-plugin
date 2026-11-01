@@ -1,10 +1,10 @@
 plugins {
     `java-library`
     id("org.strangeeons.plugin") version "1.0.0"
+    id("net.researchgate.release") version "3.2.0"
 }
 
 group = "org.strangeeons.plugins"
-version = "0.1.0-SNAPSHOT"
 description = "Registers GraalJS (modern ECMAScript) as a scripting language with Strange Eons."
 
 java {
@@ -35,6 +35,13 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+release {
+    git {
+        // Review the release commits and tag, then push with --follow-tags.
+        pushToRemote = false
+    }
 }
 
 tasks.withType<JavaCompile>().configureEach {

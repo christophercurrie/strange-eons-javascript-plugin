@@ -146,6 +146,20 @@ The engine logs `GraalJS <version> on <runtime> runtime` once at INFO;
 - **Version string.** `Engine.getVersion()` reports "Development Build"
   rather than 25.0.5 in this packaging.
 
+## Publishing
+
+The bundle is published only through the
+[Strange Eons registry](https://github.com/strange-eons/strange-eons-registry),
+not to Maven. CI keeps `GraalJSLanguage.selibrary` as a workflow artifact on
+every build, building the script API from the default branch of
+`strange-eons/strange-eons`.
+
+To release, run `./gradlew release` on a clean, pushed `main`: it sets the
+release version in `gradle.properties`, tags it (e.g. `1.0.0`) and bumps to the
+next snapshot. Nothing is pushed; review, then `git push --follow-tags`. The
+tag push attaches the bundle to a GitHub Release, and the registry picks it up
+from the latest release.
+
 ## License
 
 TBD. GraalJS is UPL-1.0 / MIT; the Groovy plug-in uses Apache-2.0; SE core
