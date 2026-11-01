@@ -7,6 +7,7 @@ import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.SourceSection;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.io.IOAccess;
 import org.strangeeons.scripts.ScriptException;
 import org.strangeeons.scripts.ScriptSession;
 
@@ -47,6 +48,9 @@ final class GraalJSSession implements ScriptSession {
         context = Context.newBuilder(JS)
                 .engine(engine)
                 .allowAllAccess(true)
+                .allowIO(IOAccess.newBuilder()
+                        .fileSystem(new BundledModuleFileSystem(hostClassLoader))
+                        .build())
                 .hostClassLoader(hostClassLoader)
                 // Make eval() of a module return its namespace object so
                 // exported functions are reachable from call().

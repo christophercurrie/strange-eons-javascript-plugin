@@ -67,9 +67,10 @@ The host resolves the same lifecycle names as for Rhino plug-ins
   the `$`/`@`/`#` settings syntax and everything else in SE's Rhino
   `libraries/` are Rhino-specific and are not loaded. Scripts use Java
   interop (`Java.type`) directly.
-- **No `import` of sibling files.** Module specifiers are resolved against
-  the file system, not the bundle, so `import './util.mjs'` inside a bundle
-  fails. Needs a Truffle `FileSystem` that reads bundle resources.
+- **Bundled modules only.** `import "strange-eons/ui"` loads
+  `strange-eons/ui.mjs` from the classpath of this plug-in, and those modules
+  can import each other relatively. Other specifiers use the file system, so
+  `import './util.mjs'` in a plug-in's own script still fails.
 - **Host classes come from this plug-in's classloader chain** (the plug-in
   bundle → SE library tier → application). Classes in other plug-ins'
   isolated bundles are not visible to `Java.type`.
