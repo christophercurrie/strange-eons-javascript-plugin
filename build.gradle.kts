@@ -1,10 +1,6 @@
-import java.util.Calendar
-import java.util.GregorianCalendar
-import java.util.TimeZone
-
 plugins {
     `java-library`
-    id("com.gradleup.shadow") version "9.0.0"
+    id("org.strangeeons.plugin") version "1.0.0"
 }
 
 group = "org.strangeeons.plugins"
@@ -45,22 +41,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
-// Stamp the eons-plugin manifest's CATALOGUEID with a build-time timestamp.
-// Format matches CatalogID.toDateString(): UTC, 0-based month, no padding.
-// The UUID portion is preserved from the source file.
-tasks.processResources {
-    outputs.upToDateWhen { false }
-    filesMatching("eons-plugin") {
-        val cal = GregorianCalendar(TimeZone.getTimeZone("UTC"))
-        val ts = listOf(
-            Calendar.YEAR, Calendar.MONTH, Calendar.DAY_OF_MONTH,
-            Calendar.HOUR_OF_DAY, Calendar.MINUTE, Calendar.SECOND, Calendar.MILLISECOND,
-        ).joinToString("-") { cal.get(it).toString() }
-        val pattern = Regex("""(CATALOGU?E?ID\{[-\da-fA-F]+:)\d+-\d+-\d+-\d+-\d+-\d+-\d+(\})""")
-        filter { line -> pattern.replace(line) { "${it.groupValues[1]}$ts${it.groupValues[2]}" } }
-    }
-}
-
 // JVM options Strange Eons needs at launch to host GraalJS on JDK 25
 // without warnings; tests use the same set. See README "Launch options".
 val graalHostJvmArgs = listOf(
@@ -80,27 +60,18 @@ tasks.test {
     useJUnitPlatform()
 }
 
-// Strange Eons consumes plug-in bundles as JARs renamed .selibrary. The fat
-// JAR holds this plug-in plus GraalJS/Truffle, unrelocated: Truffle discovers
-// languages and its runtime through META-INF/services, so service files must
-// be merged and package names must not change.
-tasks.jar {
-    enabled = false
+// The bundle holds this plug-in plus GraalJS/Truffle, unrelocated: Truffle
+// discovers languages and its runtime through META-INF/services, so package
+// names must not change.
+strangeEonsPlugin {
+    bundleName = "GraalJSLanguage"
 }
 
-tasks.shadowJar {
-    archiveBaseName = "GraalJSLanguage"
-    archiveClassifier = ""
-    archiveVersion = ""
-    archiveExtension = "selibrary"
-    mergeServiceFiles()
+tasks.sePlugin {
     // Polyglot/Truffle jars are multi-release; keep versioned entries live.
     manifest {
         attributes("Multi-Release" to "true")
     }
-    // Module descriptors from the merged jars are meaningless in a fat JAR
-    // and confuse tools that inspect it.
-    exclude("module-info.class", "META-INF/versions/*/module-info.class")
 }
 
 // --- bundleTest: loads the built .selibrary the way Strange Eons does ------
@@ -124,7 +95,7 @@ val bundleTestTask = tasks.register<Test>("bundleTest") {
     testClassesDirs = bundleTest.output.classesDirs
     classpath = bundleTest.runtimeClasspath
     useJUnitPlatform()
-    val bundle = tasks.shadowJar.flatMap { it.archiveFile }
+    val bundle = tasks.sePlugin.flatMap { it.archiveFile }
     inputs.file(bundle)
     jvmArgumentProviders += CommandLineArgumentProvider {
         listOf("-Dgraaljs.bundle=${bundle.get().asFile.absolutePath}")
@@ -136,28 +107,6 @@ tasks.check {
     dependsOn(bundleTestTask)
 }
 
-// --- install into the local Strange Eons user folder -----------------------
-
-val userPluginsDir = providers.provider {
-    val override = System.getenv("STRANGE_EONS_USER_DIR")
-    val base = when {
-        override != null -> file(override)
-        System.getProperty("os.name").startsWith("Windows") ->
-            file("${System.getenv("APPDATA") ?: System.getProperty("user.home")}/StrangeEons3")
-        else -> file("${System.getProperty("user.home")}/.StrangeEons3")
-    }
-    base.resolve("plug-ins")
-}
-
-val installPlugin = tasks.register<Copy>("installPlugin") {
-    description = "Copies the built plug-in into the local Strange Eons user folder."
-    group = "distribution"
-    from(tasks.shadowJar)
-    into(userPluginsDir)
-    onlyIf { userPluginsDir.get().isDirectory }
-}
-
 tasks.assemble {
-    dependsOn(tasks.shadowJar)
-    finalizedBy(installPlugin)
+    finalizedBy(tasks.installPlugin)
 }

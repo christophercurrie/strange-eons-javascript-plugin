@@ -26,8 +26,9 @@ Pre-release. Depends on the unreleased script-language SPI in
   `Context`. `.mjs` sources are evaluated as ES modules and their exports are
   callable; other sources are classic scripts whose global functions are
   callable.
-- `.selibrary` packaging via Shadow (GraalJS/Truffle merged in, not
-  relocated; `META-INF/services` merged).
+- `.selibrary` packaging via
+  [strange-eons-gradle-plugin](https://github.com/strange-eons/strange-eons-gradle-plugin)
+  (GraalJS/Truffle merged in, not relocated; `META-INF/services` merged).
 
 ## Usage
 
@@ -85,7 +86,7 @@ By default the checkout is expected at `../strange-eons`:
 ./gradlew test          # unit tests against GraalJS on the classpath
 ./gradlew bundleTest    # loads the built .selibrary in an isolated classloader
 ./gradlew check         # both
-./gradlew shadowJar     # build build/libs/GraalJSLanguage.selibrary
+./gradlew sePlugin      # build build/libs/GraalJSLanguage.selibrary
 ```
 
 Point at a different checkout with `-PstrangeEonsDir=/path/to/strange-eons`

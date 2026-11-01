@@ -1,3 +1,9 @@
+pluginManagement {
+    repositories {
+        mavenCentral()
+    }
+}
+
 rootProject.name = "strange-eons-javascript-plugin"
 
 // The org.strangeeons.scripts SPI is not published to any repository yet, so
