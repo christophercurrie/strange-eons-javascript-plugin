@@ -63,10 +63,8 @@ The host resolves the same lifecycle names as for Rhino plug-ins
 
 ### What plug-in scripts do not get
 
-- **No SE script library.** `useLibrary`, `Eons`, `Editor`, `sprintf`,
-  the `$`/`@`/`#` settings syntax and everything else in SE's Rhino
-  `libraries/` are Rhino-specific and are not loaded. Scripts use Java
-  interop (`Java.type`) directly.
+- **No automatic script library.** SE's Rhino libraries are not loaded. Import
+  the port below, or use Java interop (`Java.type`) directly.
 - **Bundled modules only.** `import "strange-eons/ui"` loads
   `strange-eons/ui.mjs` from the classpath of this plug-in, and those modules
   can import each other relatively. Other specifiers use the file system, so
@@ -74,6 +72,43 @@ The host resolves the same lifecycle names as for Rhino plug-ins
 - **Host classes come from this plug-in's classloader chain** (the plug-in
   bundle → SE library tier → application). Classes in other plug-ins'
   isolated bundles are not visible to `Java.type`.
+
+## Legacy script library
+
+`strange-eons/legacy` ports SE's standard script libraries:
+
+```js
+import { ImageUtils, Settings, TypeGrid, textField } from "strange-eons/legacy";
+```
+
+`strange-eons/legacy/prefab` and `strange-eons/legacy/backwards-compatibility`
+are imported separately. Exports such as `getPluginType` must be re-exported by
+the plug-in for SE to find them.
+
+Differences from the Rhino libraries:
+
+- **Imports replace `useLibrary` and `require`.** Library functions are exports,
+  not globals. `Packages`, `importClass`, and the `ca`, `arkham`, `swing`,
+  `java`, and similar package names are gone; use `Java.type`.
+- **No bean properties.** Call `field.getText()` and `field.setFont(f)`, not
+  `field.text` and `field.font = f`.
+- **No inherited statics.** `Color.BLACK` is undefined because `Color` is
+  `Settings.Colour`; use `Java.type("java.awt.Color").BLACK`.
+- **Java strings are JS strings.** Use `===` and `.length`, not `.equals()` and
+  `.length()`.
+- **Fractional numbers do not convert to `int`.** Round them before calling Java.
+- **No `$key`, `@key`, or `#key` syntax.** Use `$("key")`, `string("key")`, and
+  `gstring("key")`. `settings.set("key", value)` replaces `$key = value`.
+- **`Eons` is the `StrangeEons` class.** Static methods work: `Eons.getWindow()`.
+  `Component`, `Editor`, and `sourcefile` are not defined.
+- **`testDIYScript(gameCode, handlers)`** takes the DIY functions as an object,
+  and `prefab(baseKey, hooks)` returns them. `testProjectScript` is removed.
+- **`Error.warn` and `Error.deprecated`** do not report a script location.
+
+Threads are limited, because one thread at a time can run script code in a
+session. `Thread.busyWindow` always fails, as does `Thread.join` on a thread
+started in the same call. A `Thread.run` task works only if no other script
+code is running while it runs, so it cannot overlap the code that started it.
 
 ## Build
 
