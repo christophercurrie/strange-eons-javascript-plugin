@@ -7,13 +7,11 @@ import org.strangeeons.scripts.ScriptSession;
 /**
  * Registers GraalJS as a scripting language for Strange Eons plug-ins.
  * Discovered via {@link java.util.ServiceLoader} when SE's plug-in loader
- * resolves a manifest with {@code script-language = javascript}.
+ * resolves a manifest with {@code script-language = ecmascript}.
  *
- * <p><b>Host dependency:</b> Strange Eons currently routes
- * {@code javascript} (case-insensitively) and an absent
- * {@code script-language} straight to the built-in Strange Rhino engine
- * without consulting the {@code ScriptLanguage} registry, so this
- * implementation is never selected until SE changes that dispatch.
+ * <p>The id is not {@code javascript} because Strange Eons reserves that
+ * value, along with an absent {@code script-language}, for the built-in
+ * Strange Rhino engine.
  *
  * <p>The host may instantiate this class more than once (it re-runs
  * {@code ServiceLoader} per lookup), so it holds no state; sessions share a
@@ -22,7 +20,7 @@ import org.strangeeons.scripts.ScriptSession;
 public final class GraalJSLanguage implements ScriptLanguage {
 
     /** The {@code script-language} manifest value that selects this runtime. */
-    public static final String ID = "javascript";
+    public static final String ID = "ecmascript";
 
     @Override
     public String id() {

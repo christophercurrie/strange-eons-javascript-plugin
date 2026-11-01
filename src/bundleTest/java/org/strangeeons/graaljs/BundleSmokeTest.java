@@ -41,11 +41,11 @@ class BundleSmokeTest {
         bundleLoader = new URLClassLoader(new URL[]{bundle.toURI().toURL()},
                 ScriptLanguage.class.getClassLoader());
         for (ScriptLanguage l : ServiceLoader.load(ScriptLanguage.class, bundleLoader)) {
-            if ("javascript".equals(l.id())) {
+            if ("ecmascript".equals(l.id())) {
                 language = l;
             }
         }
-        assertNotNull(language, "bundle does not register a javascript ScriptLanguage");
+        assertNotNull(language, "bundle does not register an ecmascript ScriptLanguage");
     }
 
     @AfterAll

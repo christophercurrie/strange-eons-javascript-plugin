@@ -6,16 +6,13 @@ SPI, giving plug-in authors current ECMAScript (classes with private fields,
 optional chaining, `??`, ES modules, `Intl`, etc.) alongside the built-in
 Strange Rhino engine.
 
-When a plug-in's `eons-plugin` manifest declares `script-language = javascript`,
-SE is meant to look up this implementation via `ServiceLoader` and run the
-plug-in's script in a `GraalJSSession` (one polyglot `Context` per plug-in,
-all sharing one process-wide `Engine`).
+When a plug-in's `eons-plugin` manifest declares `script-language = ecmascript`,
+SE looks up this implementation via `ServiceLoader` and runs the plug-in's
+script in a `GraalJSSession` (one polyglot `Context` per plug-in, all sharing
+one process-wide `Engine`).
 
-> **Not reachable yet.** Strange Eons currently sends `javascript` (any case)
-> and a missing `script-language` straight to Strange Rhino without
-> consulting the `ScriptLanguage` registry
-> (`AbstractInstalledPlugin.startPluginImpl`). Until that dispatch changes,
-> SE never selects this plug-in.
+The id is not `javascript` because SE reserves that value (any case), along
+with a missing `script-language`, for Strange Rhino.
 
 ## Status
 
@@ -24,7 +21,7 @@ Pre-release. Depends on the unreleased script-language SPI in
 (module `strange-eons-script-api`).
 
 - `org.strangeeons.graaljs.GraalJSLanguage` — `ScriptLanguage` with id
-  `javascript` (display name "JavaScript"), extension `.mjs`.
+  `ecmascript` (display name "JavaScript"), extension `.mjs`.
 - `org.strangeeons.graaljs.GraalJSSession` — `ScriptSession` over a GraalJS
   `Context`. `.mjs` sources are evaluated as ES modules and their exports are
   callable; other sources are classic scripts whose global functions are
@@ -37,7 +34,7 @@ Pre-release. Depends on the unreleased script-language SPI in
 In the plug-in bundle's `eons-plugin`:
 
 ```properties
-script-language = javascript
+script-language = ecmascript
 res://mygame/plugin.mjs
 ```
 

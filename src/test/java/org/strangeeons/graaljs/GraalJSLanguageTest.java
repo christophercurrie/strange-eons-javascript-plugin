@@ -41,7 +41,7 @@ class GraalJSLanguageTest {
     void idFollowsSpiConvention() {
         // ScriptLanguage.id() must be lower-case ASCII; "JavaScript" is the display name.
         GraalJSLanguage lang = new GraalJSLanguage();
-        assertEquals("javascript", lang.id());
+        assertEquals("ecmascript", lang.id());
         assertEquals("JavaScript", lang.displayName());
     }
 
