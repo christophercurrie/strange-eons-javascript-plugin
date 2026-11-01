@@ -13,6 +13,7 @@ import java.util.jar.JarFile;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.strangeeons.scripts.ScriptException;
 import org.strangeeons.scripts.ScriptLanguage;
 import org.strangeeons.scripts.ScriptSession;
 
@@ -82,6 +83,17 @@ class BundleSmokeTest {
         try (ScriptSession s = language.createSession()) {
             s.eval("export function initialize() { return Object.hasOwn({ a: 1 }, 'a'); }", "plugin.mjs");
             assertEquals(Boolean.TRUE, s.call("initialize"));
+        }
+    }
+
+    @Test
+    void legacyModuleIsPackaged() throws Exception {
+        // The application is absent here, so the import stops at its first
+        // application class rather than at module resolution.
+        try (ScriptSession s = language.createSession()) {
+            ScriptException e = assertThrows(ScriptException.class,
+                    () -> s.eval("import 'strange-eons/legacy';", "plugin.mjs"));
+            assertTrue(e.getMessage().contains("ca.cgjennings.apps.arkham.StrangeEons"), e.getMessage());
         }
     }
 
