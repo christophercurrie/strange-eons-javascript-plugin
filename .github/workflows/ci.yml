@@ -33,6 +33,7 @@ jobs:
     if: github.ref_type == 'tag'
     needs: build
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     steps:
