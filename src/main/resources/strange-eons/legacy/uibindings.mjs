@@ -1,16 +1,17 @@
 // Bindings between controls and component settings, adapted from Strange
 // Eons' uibindings.js.
+import { Java, facade } from "../internal/host.mjs";
 import { Settings, sprintf } from "./common.mjs";
 
 const pkg = "ca.cgjennings.apps.arkham";
 const AWTComponent = Java.type("java.awt.Component");
 const ButtonGroup = Java.type("javax.swing.ButtonGroup");
 const GameComponent = Java.type(`${pkg}.component.GameComponent`);
-const JavaClass = Java.type("java.lang.Class");
+const HostClasses = Java.type("org.strangeeons.graaljs.HostClasses");
 const JScrollPane = Java.type("javax.swing.JScrollPane");
 const TintableBinding = Java.type(`${pkg}.plugins.UILibraryHelper$TintableBinding`);
 
-export const SettingBackedControl = Java.type(`${pkg}.diy.SettingBackedControl`);
+export const SettingBackedControl = facade(`${pkg}.diy.SettingBackedControl`, {});
 
 export function Binding(name, uiControl, gameComponent, sheetsToUpdate) {
     if (!name) {
@@ -124,8 +125,8 @@ Binding.prototype.toString = function toString() {
             sheets.push(i);
         }
     }
-    return `Binding "${this.name}": [${this.control.getClass().getSimpleName()} -> `
-            + `${this.component.getClass().getSimpleName()}], sheets: [${sheets.join(", ")}]`;
+    return `Binding "${this.name}": [${HostClasses.simpleName(this.control)} -> `
+            + `${HostClasses.simpleName(this.component)}], sheets: [${sheets.join(", ")}]`;
 };
 
 export function ActiveBinding(name, uiControl, gameComponent, sheetsToUpdate) {
@@ -155,9 +156,9 @@ const bindingClasses = new Map();
 
 Bindings.prototype.add = function add(name, control, sheets, bindClass) {
     const target = control instanceof JScrollPane ? control.getViewport().getView() : control;
-    const type = bindClass ?? Bindings.getBindingClass(target.getClass());
+    const type = bindClass ?? Bindings.getBindingClass(target);
     if (type == null) {
-        throw new Error("no binding class is registered for " + target.getClass());
+        throw new Error("no binding class is registered for " + HostClasses.name(target));
     }
     const binding = new type(name, target, this.component, sheets);
     (binding.isActive ? this.activeBindings : this.bindings).push(binding);
@@ -216,9 +217,9 @@ Bindings.prototype.toString = function toString() {
     return [this.bindings, this.activeBindings].map((list) => list.map(line).join("")).join("");
 };
 
-Bindings.getBindingClass = function getBindingClass(componentClass) {
-    for (let type = componentClass; type != null; type = type.getSuperclass()) {
-        const binding = bindingClasses.get(type.getName());
+Bindings.getBindingClass = function getBindingClass(control) {
+    for (const name of HostClasses.hierarchy(control)) {
+        const binding = bindingClasses.get(name);
         if (binding) {
             return binding;
         }
@@ -227,14 +228,7 @@ Bindings.getBindingClass = function getBindingClass(componentClass) {
 };
 
 Bindings.registerBindingClass = function registerBindingClass(componentClass, bindingClass) {
-    let name;
-    if (Java.isType(componentClass)) {
-        name = componentClass.class.getName();
-    } else if (componentClass instanceof JavaClass) {
-        name = componentClass.getName();
-    } else {
-        name = String(componentClass);
-    }
+    const name = Java.isType(componentClass) ? HostClasses.name(componentClass.class) : String(componentClass);
     bindingClasses.set(name, bindingClass);
 };
 

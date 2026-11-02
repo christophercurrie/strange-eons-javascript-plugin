@@ -93,17 +93,17 @@ class BundleSmokeTest {
         try (ScriptSession s = language.createSession()) {
             ScriptException e = assertThrows(ScriptException.class,
                     () -> s.eval("import 'strange-eons/legacy';", "plugin.mjs"));
-            assertTrue(e.getMessage().contains("ca.cgjennings.apps.arkham.StrangeEons"), e.getMessage());
+            assertTrue(e.getMessage().contains("ca.cgjennings.apps.arkham"), e.getMessage());
         }
     }
 
     @Test
-    void hostLookupSeesParentClasses() throws Exception {
-        // In SE the parent chain holds the application; here it holds the
-        // script API. Either way Java.type must resolve through it.
+    void hostBoundaryIsActive() throws Exception {
         try (ScriptSession s = language.createSession()) {
-            Object r = s.eval("Java.type('org.strangeeons.scripts.ScriptException').class.getName()", "host.js");
-            assertEquals("org.strangeeons.scripts.ScriptException", r);
+            assertEquals(Boolean.TRUE, s.eval("Java.isType(Java.type('java.util.ArrayList'))", "boundary.js"));
+            ScriptException e = assertThrows(ScriptException.class,
+                    () -> s.eval("Java.type('org.strangeeons.scripts.ScriptException')", "boundary.js"));
+            assertTrue(e.getMessage().contains("not available to plug-in scripts"), e.getMessage());
         }
     }
 

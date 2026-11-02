@@ -64,14 +64,18 @@ The host resolves the same lifecycle names as for Rhino plug-ins
 ### What plug-in scripts do not get
 
 - **No automatic script library.** SE's Rhino libraries are not loaded. Import
-  the port below, or use Java interop (`Java.type`) directly.
+  the port below.
+- **No direct access to application classes.** `Java.type` serves an allowlist
+  of JDK classes: `java.awt`, `java.io`, `java.math`, `java.net`, `java.nio`,
+  `java.text`, `java.time`, `java.util`, `javax.swing`, and basic `java.lang`
+  value types. Application classes are reached through `strange-eons/legacy`.
+  Objects the library returns keep their public methods. `getClass`, reflection,
+  `Thread`, and class loaders are not available. This keeps plug-ins on the
+  supported API; it is not a security sandbox.
 - **Bundled modules only.** `import "strange-eons/ui"` loads
   `strange-eons/ui.mjs` from the classpath of this plug-in, and those modules
   can import each other relatively. Other specifiers use the file system, so
   `import './util.mjs'` in a plug-in's own script still fails.
-- **Host classes come from this plug-in's classloader chain** (the plug-in
-  bundle → SE library tier → application). Classes in other plug-ins'
-  isolated bundles are not visible to `Java.type`.
 
 ## Legacy script library
 
@@ -92,8 +96,11 @@ Differences from the Rhino libraries:
   `java`, and similar package names are gone; use `Java.type`.
 - **No bean properties.** Call `field.getText()` and `field.setFont(f)`, not
   `field.text` and `field.font = f`.
-- **No inherited statics.** `Color.BLACK` is undefined because `Color` is
-  `Settings.Colour`; use `Java.type("java.awt.Color").BLACK`.
+- **Application classes are facades.** `Settings`, `DIY`, `Game`, and the like
+  expose listed static members, including inherited ones such as `Color.BLACK`,
+  and support `new` and `instanceof`, but are not Java classes:
+  `Settings.class` is undefined. A facade cannot be subclassed,
+  and `Java.extend` is not available.
 - **Java strings are JS strings.** Use `===` and `.length`, not `.equals()` and
   `.length()`.
 - **Fractional numbers do not convert to `int`.** Round them before calling Java.
@@ -101,6 +108,7 @@ Differences from the Rhino libraries:
   `gstring("key")`. `settings.set("key", value)` replaces `$key = value`.
 - **`Eons` is the `StrangeEons` class.** Static methods work: `Eons.getWindow()`.
   `Component`, `Editor`, and `sourcefile` are not defined.
+- **`Bindings.getBindingClass`** takes a control, not a class.
 - **`testDIYScript(gameCode, handlers)`** takes the DIY functions as an object,
   and `prefab(baseKey, hooks)` returns them. `testProjectScript` is removed.
 - **`Error.warn` and `Error.deprecated`** do not report a script location.

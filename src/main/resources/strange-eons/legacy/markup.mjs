@@ -1,11 +1,51 @@
 // Markup boxes and text styles, adapted from Strange Eons' markup.js.
+import { Java, facade } from "../internal/host.mjs";
 import { ResourceKit } from "./common.mjs";
 
-export const MarkupBox = Java.type("ca.cgjennings.layout.MarkupRenderer");
-export const GenderMarkupBox = Java.type("ca.cgjennings.layout.GenderAwareMarkupRenderer");
-export const TextStyle = Java.type("ca.cgjennings.layout.TextStyle");
+export const MarkupBox = facade("ca.cgjennings.layout.MarkupRenderer", {
+    constants: [
+        "DEBUG", "FIT_BOTH", "FIT_NONE", "FIT_SCALE_TEXT", "FIT_TIGHTEN_LINE_SPACING",
+        "LAYOUT_BOTTOM", "LAYOUT_CENTER", "LAYOUT_JUSTIFY", "LAYOUT_LEFT", "LAYOUT_MIDDLE",
+        "LAYOUT_RIGHT", "LAYOUT_TOP", "USE_FAST_LINE_BREAKER", "USE_PATCHED_LINE_BREAKER"
+    ],
+    methods: [
+        "convertTagsToLinebreaks", "getDefaultExpansionLimit", "getEvaluatorFactory",
+        "parseMeasurement", "setDefaultExpansionLimit", "setEvaluatorFactory"
+    ],
+    constructible: true
+});
+export const GenderMarkupBox = facade("ca.cgjennings.layout.GenderAwareMarkupRenderer", {
+    constants: [
+        "DEBUG", "FIT_BOTH", "FIT_NONE", "FIT_SCALE_TEXT", "FIT_TIGHTEN_LINE_SPACING",
+        "GENDER_LEFT", "GENDER_MIDDLE", "GENDER_RIGHT", "LAYOUT_BOTTOM", "LAYOUT_CENTER",
+        "LAYOUT_JUSTIFY", "LAYOUT_LEFT", "LAYOUT_MIDDLE", "LAYOUT_RIGHT", "LAYOUT_TOP",
+        "USE_FAST_LINE_BREAKER", "USE_PATCHED_LINE_BREAKER"
+    ],
+    methods: [
+        "capitalize", "convertTagsToLinebreaks", "getDefaultExpansionLimit",
+        "getEvaluatorFactory", "parseMeasurement", "setDefaultExpansionLimit",
+        "setEvaluatorFactory"
+    ],
+    constructible: true
+});
+export const TextStyle = facade("ca.cgjennings.layout.TextStyle", {
+    constants: [
+        "BOLD_STYLE", "COLOR_BLACK", "COLOR_BLUE", "COLOR_BROWN", "COLOR_DKGREY",
+        "COLOR_GREEN", "COLOR_GREY", "COLOR_LTGREY", "COLOR_ORANGE", "COLOR_PURPLE",
+        "COLOR_RED", "COLOR_WHITE", "COLOR_YELLOW", "ITALIC_STYLE", "JUSTIFY", "KERNING_OFF",
+        "KERNING_ON", "LIGATURES_OFF", "LIGATURES_ON", "PLAIN_STYLE", "SANSSERIF_STYLE",
+        "SERIF_STYLE", "STRIKETHROUGH_STYLE", "SUBSCRIPT_STYLE", "SUPERSCRIPT_STYLE",
+        "TYPEWRITER_STYLE", "UNDERLINE_STYLE", "UPRIGHT_STYLE"
+    ],
+    constructible: true
+});
 export const TextAttribute = Java.type("java.awt.font.TextAttribute");
-export const PageShape = Java.type("ca.cgjennings.layout.PageShape");
+export const PageShape = facade("ca.cgjennings.layout.PageShape", {
+    constants: [
+        "RECTANGLE_SHAPE"
+    ],
+    constructible: true
+});
 
 const Sheet = Java.type("ca.cgjennings.apps.arkham.sheet.Sheet");
 

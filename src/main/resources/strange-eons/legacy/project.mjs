@@ -1,14 +1,83 @@
 // Project system extensions, adapted from Strange Eons' project.js.
+import { Java, facade } from "../internal/host.mjs";
 export const File = Java.type("java.io.File");
-export const Member = Java.type("ca.cgjennings.apps.arkham.project.Member");
-export const Task = Java.type("ca.cgjennings.apps.arkham.project.Task");
-export const TaskAction = Java.type("ca.cgjennings.apps.arkham.project.TaskAction");
-export const Project = Java.type("ca.cgjennings.apps.arkham.project.Project");
-export const Actions = Java.type("ca.cgjennings.apps.arkham.project.Actions");
-export const Open = Java.type("ca.cgjennings.apps.arkham.project.Open");
-export const ProjectUtilities = Java.type("ca.cgjennings.apps.arkham.project.ProjectUtilities");
+export const Member = facade("ca.cgjennings.apps.arkham.project.Member", {
+    methods: [
+        "getExcludedFilePatterns", "isFileExcluded", "registerMetadataSource",
+        "setExcludedFilePatterns", "unregisterMetadataSource"
+    ],
+    constructible: true
+});
+export const Task = facade("ca.cgjennings.apps.arkham.project.Task", {
+    constants: [
+        "KEY_ICON", "KEY_SUBTYPE", "KEY_TYPE"
+    ],
+    methods: [
+        "createTask", "getCustomIcons", "getExcludedFilePatterns", "isFileExcluded",
+        "isTaskFolder", "registerCustomIcon", "registerMetadataSource",
+        "setExcludedFilePatterns", "unregisterCustomIcon", "unregisterMetadataSource"
+    ],
+    constructible: true
+});
+export const TaskAction = facade("ca.cgjennings.apps.arkham.project.TaskAction", {});
+export const Project = facade("ca.cgjennings.apps.arkham.project.Project", {
+    constants: [
+        "KEY_ICON", "KEY_RESOURCE_ID", "KEY_SUBTYPE", "KEY_TYPE", "PROJECT_TASK_TYPE"
+    ],
+    methods: [
+        "createProject", "createTask", "getCustomIcons", "getExcludedFilePatterns",
+        "isFileExcluded", "isProjectFolder", "isProjectPackage", "isTaskFolder", "open",
+        "registerCustomIcon", "registerMetadataSource", "setExcludedFilePatterns", "unpackage",
+        "unregisterCustomIcon", "unregisterMetadataSource"
+    ],
+    constructible: true
+});
+export const Actions = facade("ca.cgjennings.apps.arkham.project.Actions", {
+    constants: [
+        "PRIORITY_BUILD", "PRIORITY_BUILD_SECONDARY", "PRIORITY_CLIPBOARD",
+        "PRIORITY_DEBUGGING_TOOL", "PRIORITY_DEFAULT", "PRIORITY_FILE_MANAGEMENT",
+        "PRIORITY_FILE_MANAGEMENT_SECONDARY", "PRIORITY_IMPORT_EXPORT", "PRIORITY_MAX",
+        "PRIORITY_MIN", "PRIORITY_STANDARD_FIRST", "PRIORITY_STANDARD_LAST"
+    ],
+    methods: [
+        "findActionByName", "getPriorityForAction", "getRootActions", "getUnspecializedAction",
+        "register", "unregister"
+    ]
+});
+export const Open = facade("ca.cgjennings.apps.arkham.project.Open", {
+    methods: [
+        "deleteOpenRule", "getOpenRule", "getRuleCommand", "getRuleExtensions",
+        "registerOpener", "runCommand", "setOpenRule", "setRuleCommand", "splitCommand",
+        "unregisterOpener"
+    ],
+    constructible: true
+});
+export const ProjectUtilities = facade("ca.cgjennings.apps.arkham.project.ProjectUtilities", {
+    constants: [
+        "BUNDLE_EXTENSIONS", "ENC_SCRIPT", "ENC_SETTINGS", "ENC_UI_PROPERTIES", "ENC_UTF8",
+        "IMAGE_EXTENSIONS"
+    ],
+    methods: [
+        "changeExtension", "contains", "copyFile", "copyFolder", "copyReader",
+        "copyResourceToFile", "copyStream", "copyToArchive", "createPluginBundleArchive",
+        "deleteAll", "exec", "execAsync", "formatByteSize", "getAvailableFile",
+        "getFileAsString", "getFileExtension", "getFileText", "getResourceText",
+        "listMatchingMembers", "makeFileRelativeTo", "matchExtension", "merge", "moveFile",
+        "runScript", "sameFile", "saveAllOpenProjectFiles", "saveIfBeingEdited", "simplify",
+        "writeTextFile"
+    ]
+});
 export const ProjectUtils = ProjectUtilities;
-export const NewTaskType = Java.type("ca.cgjennings.apps.arkham.project.NewTaskType");
+export const NewTaskType = facade("ca.cgjennings.apps.arkham.project.NewTaskType", {
+    constants: [
+        "CASEBOOK_TYPE", "DECK_TYPE", "DOCUMENTATION_TYPE", "EXPANSION_BOARD_TYPE",
+        "FACTORY_SCRIPTED_SUBTYPE", "FACTORY_TYPE", "GENERIC_TYPE", "PLUGIN_TYPE",
+        "TASK_GROUP_TYPE"
+    ],
+    methods: [
+        "getNewTaskTypes", "isRegistered", "register", "unregister"
+    ]
+});
 
 const trackers = [];
 

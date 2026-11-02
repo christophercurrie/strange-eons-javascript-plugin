@@ -1,4 +1,5 @@
 // Simple panel layout, adapted from Strange Eons' uilayout.js.
+import { Java } from "../internal/host.mjs";
 import { assertDispatchThread, Eons, string } from "./common.mjs";
 
 const AWTComponent = Java.type("java.awt.Component");

@@ -1,5 +1,6 @@
 // Older script library names, adapted from Strange Eons'
 // backwards-compatibility.js.
+import { Java } from "../internal/host.mjs";
 import { alert, Console, Settings, string, useSettings } from "./common.mjs";
 import { ClassMap, Expansion, Game } from "./extension.mjs";
 import { FontUtils } from "./fontutils.mjs";

@@ -1,11 +1,51 @@
 // Scripted game components, adapted from Strange Eons' diy.js.
+import { facade } from "../internal/host.mjs";
 import { Eons, useSettings } from "./common.mjs";
 
-export const DIY = Java.type("ca.cgjennings.apps.arkham.diy.DIY");
-export const DIYSheet = Java.type("ca.cgjennings.apps.arkham.diy.DIYSheet");
-export const FaceStyle = Java.type("ca.cgjennings.apps.arkham.diy.DIY$FaceStyle");
-export const DeckSnappingHint = Java.type("ca.cgjennings.apps.arkham.sheet.Sheet$DeckSnappingHint");
-export const HighResolutionMode = Java.type("ca.cgjennings.apps.arkham.diy.DIY$HighResolutionMode");
+export const DIY = facade("ca.cgjennings.apps.arkham.diy.DIY", {
+    methods: [
+        "createTestInstance", "filterComponentText", "idealScaleForImage", "imagePathToImage"
+    ],
+    constructible: true
+});
+export const DIYSheet = facade("ca.cgjennings.apps.arkham.diy.DIYSheet", {
+    constants: [
+        "ALIGN_CENTER", "ALIGN_LEADING", "ALIGN_LEFT", "ALIGN_RIGHT", "ALIGN_TRAILING",
+        "DEBUG_BLEED_MARGIN", "DEBUG_PORTRAIT_REGION", "DEBUG_UNSAFE_AREA",
+        "DEFAULT_HIGH_RESOLUTION_PPI", "ON_PAINT_EVENT_METHOD", "ROTATE_LEFT", "ROTATE_NONE",
+        "ROTATE_RIGHT", "ROTATE_UPSIDE_DOWN"
+    ],
+    methods: [
+        "doStandardRendererInitialization", "drawPortraitBox", "getExpansionSymbol",
+        "parseExpansionList", "setNamesForRenderer"
+    ],
+    constructible: true
+});
+export const FaceStyle = facade("ca.cgjennings.apps.arkham.diy.DIY$FaceStyle", {
+    constants: [
+        "CARD_AND_MARKER", "EIGHT_FACES", "FOUR_FACES", "ONE_FACE", "PLAIN_BACK",
+        "SHARED_FACE", "SIX_FACES", "TWO_FACES"
+    ],
+    methods: [
+        "valueOf", "values"
+    ]
+});
+export const DeckSnappingHint = facade("ca.cgjennings.apps.arkham.sheet.Sheet$DeckSnappingHint", {
+    constants: [
+        "CARD", "INLAY", "OTHER", "OVERLAY", "TILE"
+    ],
+    methods: [
+        "valueOf", "values"
+    ]
+});
+export const HighResolutionMode = facade("ca.cgjennings.apps.arkham.diy.DIY$HighResolutionMode", {
+    constants: [
+        "DISABLE", "ENABLE", "FORCE"
+    ],
+    methods: [
+        "valueOf", "values"
+    ]
+});
 
 /**
  * Opens a test editor for a component. {@code handlers} holds the functions a

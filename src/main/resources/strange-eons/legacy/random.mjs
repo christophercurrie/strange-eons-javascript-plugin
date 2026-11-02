@@ -1,4 +1,5 @@
 // Pseudorandom number generation, adapted from Strange Eons' random.js.
+import { Java } from "../internal/host.mjs";
 import { Console, print, ResourceKit } from "./common.mjs";
 
 const JavaRandom = Java.type("java.util.Random");

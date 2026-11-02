@@ -1,4 +1,5 @@
 // Script library registry access, adapted from Strange Eons' libutils.js.
+import { Java } from "../internal/host.mjs";
 const LibraryRegistry = Java.type("ca.cgjennings.apps.arkham.plugins.LibraryRegistry");
 const ScriptMonkey = Java.type("ca.cgjennings.apps.arkham.plugins.ScriptMonkey");
 
