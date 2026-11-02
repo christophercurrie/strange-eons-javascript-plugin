@@ -1,5 +1,8 @@
 package org.strangeeons.graaljs;
 
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
 import java.util.Set;
 import org.strangeeons.scripts.ScriptLanguage;
 import org.strangeeons.scripts.ScriptSession;
@@ -44,7 +47,17 @@ public final class GraalJSLanguage implements ScriptLanguage {
 
     @Override
     public ScriptSession createSession() {
-        return new GraalJSSession(SharedEngine.get(), GraalJSLanguage.class.getClassLoader());
+        return new GraalJSSession(SharedEngine.get(), GraalJSLanguage.class.getClassLoader(),
+                GraalJSLanguage::resourceUrl);
+    }
+
+    /** Resolves through Strange Eons's {@code res:} protocol, which searches every plug-in. */
+    private static URL resourceUrl(String name) {
+        try {
+            return URI.create("res://" + name).toURL();
+        } catch (MalformedURLException | IllegalArgumentException e) {
+            return null;
+        }
     }
 
     // wrapBundleClassLoader: default (identity). JavaScript source is never

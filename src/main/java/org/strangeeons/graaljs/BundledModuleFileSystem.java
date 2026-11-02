@@ -21,6 +21,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import org.graalvm.polyglot.io.FileSystem;
 
 /**
@@ -32,6 +33,9 @@ import org.graalvm.polyglot.io.FileSystem;
  * reserved root, so relative imports between bundled modules resolve normally.
  * A specifier that escapes the namespace is rejected, and after {@link #seal}
  * so is one that names {@code strange-eons/internal}.
+ *
+ * <p>Modules that belong to other plug-ins map to a second reserved root and
+ * are read through a resolver, so their relative imports also resolve normally.
  */
 final class BundledModuleFileSystem implements FileSystem {
 
@@ -41,13 +45,48 @@ final class BundledModuleFileSystem implements FileSystem {
             .resolve(".strange-eons-bundled-modules");
     private static final Path NAMESPACE = ROOT.resolve(PREFIX);
     private static final Path INTERNAL = NAMESPACE.resolve("internal");
+    private static final Path RESOURCES = Path.of("").toAbsolutePath().getRoot()
+            .resolve(".strange-eons-plugin-resources");
 
     private final FileSystem delegate = FileSystem.newDefaultFileSystem();
     private final ClassLoader loader;
+    private final Function<String, URL> resources;
     private volatile boolean sealed;
 
     BundledModuleFileSystem(ClassLoader loader) {
+        this(loader, name -> null);
+    }
+
+    /**
+     * @param resources maps a resource name to its location, or to {@code null}
+     *     if the name cannot be located
+     */
+    BundledModuleFileSystem(ClassLoader loader, Function<String, URL> resources) {
         this.loader = loader;
+        this.resources = resources;
+    }
+
+    /**
+     * Returns the path that a plug-in resource's module is imported from.
+     *
+     * @throws InvalidPathException if the name escapes the plug-in resources
+     */
+    static Path resourcePath(String name) {
+        Path path = RESOURCES.resolve(name).normalize();
+        if (!path.startsWith(RESOURCES) || path.equals(RESOURCES)) {
+            throw new InvalidPathException(name, "not a plug-in resource");
+        }
+        return path;
+    }
+
+    /** Returns whether a plug-in resource exists. */
+    boolean hasResource(Path path) {
+        try {
+            requireResource(path);
+            return true;
+        } catch (NoSuchFileException e) {
+            return false;
+        }
     }
 
     @Override
@@ -177,7 +216,11 @@ final class BundledModuleFileSystem implements FileSystem {
     }
 
     private static boolean isBundled(Path path) {
-        return path.isAbsolute() && path.normalize().startsWith(NAMESPACE);
+        if (!path.isAbsolute()) {
+            return false;
+        }
+        Path normal = path.normalize();
+        return normal.startsWith(NAMESPACE) || normal.startsWith(RESOURCES);
     }
 
     private static void requireWritable(Path path) throws IOException {
@@ -187,18 +230,39 @@ final class BundledModuleFileSystem implements FileSystem {
     }
 
     private URL requireResource(Path path) throws NoSuchFileException {
+        Path normal = path.normalize();
+        if (normal.startsWith(RESOURCES)) {
+            return requirePluginResource(normal);
+        }
+        URL url = loader.getResource(resourceName(ROOT.relativize(normal)));
+        if (url == null) {
+            throw new NoSuchFileException(path.toString());
+        }
+        return url;
+    }
+
+    private URL requirePluginResource(Path path) throws NoSuchFileException {
+        URL url = resources.apply(resourceName(RESOURCES.relativize(path)));
+        if (url == null) {
+            throw new NoSuchFileException(path.toString());
+        }
+        // A res: URL can be made for any name; only opening it finds out.
+        try (InputStream in = url.openStream()) {
+            return url;
+        } catch (IOException e) {
+            throw new NoSuchFileException(path.toString());
+        }
+    }
+
+    private static String resourceName(Path relative) {
         StringBuilder name = new StringBuilder();
-        for (Path part : ROOT.relativize(path.normalize())) {
+        for (Path part : relative) {
             if (name.length() > 0) {
                 name.append('/');
             }
             name.append(part);
         }
-        URL url = loader.getResource(name.toString());
-        if (url == null) {
-            throw new NoSuchFileException(path.toString());
-        }
-        return url;
+        return name.toString();
     }
 
     private static final class ReadOnlyChannel implements SeekableByteChannel {
