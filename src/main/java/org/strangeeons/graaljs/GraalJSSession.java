@@ -1,10 +1,18 @@
 package org.strangeeons.graaljs;
 
+import java.io.FileNotFoundException;
 import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.net.URL;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
@@ -57,13 +65,16 @@ final class GraalJSSession implements ScriptSession {
             .denyAccess(MethodHandles.Lookup.class)
             .build();
 
+    private static final String RESOURCE_SCHEME = "res://";
+
     private final Context context;
+    private final BundledModuleFileSystem fileSystem;
     private final AtomicBoolean closed = new AtomicBoolean();
     /** Namespace object of the last module evaluated, or null. */
     private Value exports;
 
-    GraalJSSession(Engine engine, ClassLoader hostClassLoader) {
-        BundledModuleFileSystem fileSystem = new BundledModuleFileSystem(hostClassLoader);
+    GraalJSSession(Engine engine, ClassLoader hostClassLoader, Function<String, URL> resources) {
+        fileSystem = new BundledModuleFileSystem(hostClassLoader, resources);
         context = Context.newBuilder(JS)
                 .engine(engine)
                 .allowAllAccess(true)
@@ -125,6 +136,98 @@ final class GraalJSSession implements ScriptSession {
             throw new IllegalStateException("session is closed");
         }
         context.getBindings(JS).putMember(name, value);
+    }
+
+    /**
+     * Constructs a class exported by a plug-in module. The returned object
+     * follows the conventions of Strange Rhino handlers: a method the class
+     * doesn't define does nothing and returns zero or {@code null}, unless the
+     * interface gives it a default. Calls hold the session's lock, since a JS
+     * context cannot be entered by two threads at once, and do nothing once the
+     * session is closed.
+     */
+    @Override
+    public synchronized <T> T createHandler(String spec, Class<T> type) throws ScriptException {
+        ensureOpen();
+        if (!type.isInterface()) {
+            throw new ScriptException("not an interface: " + type.getName());
+        }
+        int colon = spec.lastIndexOf(':');
+        if (colon < 0) {
+            throw new ScriptException("expected path:ExportedName: " + spec);
+        }
+        String script = spec.substring(0, colon);
+        String export = spec.substring(colon + 1);
+        Value constructor = exportedMember(script, export, spec);
+        if (constructor == null || !constructor.canInstantiate()) {
+            throw new ScriptException("module does not export a class: " + spec);
+        }
+        Value instance;
+        try {
+            instance = constructor.newInstance();
+        } catch (PolyglotException e) {
+            throw translate(e, spec);
+        }
+        return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
+                (proxy, method, args) -> invokeHandler(instance, proxy, method, args)));
+    }
+
+    private Value exportedMember(String script, String export, String spec) throws ScriptException {
+        if (script.contains(":") && !script.startsWith(RESOURCE_SCHEME)) {
+            throw new ScriptException("only res: and plain resource paths are supported: " + spec);
+        }
+        String name = script.startsWith(RESOURCE_SCHEME) ? script.substring(RESOURCE_SCHEME.length()) : script;
+        Path path;
+        try {
+            path = BundledModuleFileSystem.resourcePath(name);
+        } catch (InvalidPathException e) {
+            throw new ScriptException(spec, e);
+        }
+        if (!fileSystem.hasResource(path)) {
+            throw new ScriptException(spec, new FileNotFoundException(script));
+        }
+        String specifier = path.toString().replace('\\', '/').replace("'", "\\'");
+        Source source = Source.newBuilder(JS, "import * as handlerModule from '" + specifier + "';"
+                + " export { handlerModule };", "<handler module>").mimeType(MODULE_MIME).buildLiteral();
+        try {
+            return context.eval(source).getMember("handlerModule").getMember(export);
+        } catch (PolyglotException e) {
+            throw translate(e, spec);
+        }
+    }
+
+    private Object invokeHandler(Value instance, Object proxy, Method method, Object[] args) throws Throwable {
+        if (method.getDeclaringClass() == Object.class) {
+            return switch (method.getName()) {
+                case "equals" -> proxy == args[0];
+                case "hashCode" -> System.identityHashCode(proxy);
+                default -> "script handler of " + proxy.getClass().getInterfaces()[0].getName();
+            };
+        }
+        synchronized (this) {
+            Class<?> returnType = method.getReturnType();
+            if (closed.get()) {
+                return emptyValue(returnType);
+            }
+            if (!instance.canInvokeMember(method.getName())) {
+                return method.isDefault()
+                        ? InvocationHandler.invokeDefault(proxy, method, args)
+                        : emptyValue(returnType);
+            }
+            try {
+                Value result = instance.invokeMember(method.getName(), args == null ? new Object[0] : args);
+                return returnType == void.class || result.isNull() ? emptyValue(returnType) : result.as(returnType);
+            } catch (PolyglotException e) {
+                if (e.isHostException() && e.asHostException() instanceof RuntimeException host) {
+                    throw host;
+                }
+                throw new IllegalStateException(translate(e, method.getName() + "()").getMessage(), e);
+            }
+        }
+    }
+
+    private static Object emptyValue(Class<?> type) {
+        return type.isPrimitive() && type != void.class ? Array.get(Array.newInstance(type, 1), 0) : null;
     }
 
     @Override
