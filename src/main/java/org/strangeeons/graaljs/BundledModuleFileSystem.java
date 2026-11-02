@@ -30,7 +30,8 @@ import org.graalvm.polyglot.io.FileSystem;
  * <p>{@code import "strange-eons/ui"} reads the resource
  * {@code strange-eons/ui.mjs}. Each bundled module maps to a path under a
  * reserved root, so relative imports between bundled modules resolve normally.
- * A specifier that escapes the namespace is rejected.
+ * A specifier that escapes the namespace is rejected, and after {@link #seal}
+ * so is one that names {@code strange-eons/internal}.
  */
 final class BundledModuleFileSystem implements FileSystem {
 
@@ -39,9 +40,11 @@ final class BundledModuleFileSystem implements FileSystem {
     private static final Path ROOT = Path.of("").toAbsolutePath().getRoot()
             .resolve(".strange-eons-bundled-modules");
     private static final Path NAMESPACE = ROOT.resolve(PREFIX);
+    private static final Path INTERNAL = NAMESPACE.resolve("internal");
 
     private final FileSystem delegate = FileSystem.newDefaultFileSystem();
     private final ClassLoader loader;
+    private volatile boolean sealed;
 
     BundledModuleFileSystem(ClassLoader loader) {
         this.loader = loader;
@@ -55,14 +58,14 @@ final class BundledModuleFileSystem implements FileSystem {
             if (!resolved.startsWith(NAMESPACE)) {
                 throw new InvalidPathException(path, "escapes the bundled module namespace");
             }
-            return resolved;
+            return requirePublic(resolved, path);
         }
-        return delegate.parsePath(path);
+        return requirePublic(delegate.parsePath(path), path);
     }
 
     @Override
     public Path parsePath(URI uri) {
-        return delegate.parsePath(uri);
+        return requirePublic(delegate.parsePath(uri), uri.toString());
     }
 
     @Override
@@ -155,6 +158,22 @@ final class BundledModuleFileSystem implements FileSystem {
     @Override
     public void setCurrentWorkingDirectory(Path dir) {
         delegate.setCurrentWorkingDirectory(dir);
+    }
+
+    /**
+     * Stops plug-in specifiers from naming internal modules. Relative imports
+     * between bundled modules are resolved from the importer's path and do not
+     * pass through {@link #parsePath}.
+     */
+    void seal() {
+        sealed = true;
+    }
+
+    private Path requirePublic(Path path, String specifier) {
+        if (sealed && delegate.toAbsolutePath(path).normalize().startsWith(INTERNAL)) {
+            throw new InvalidPathException(specifier, "internal module");
+        }
+        return path;
     }
 
     private static boolean isBundled(Path path) {

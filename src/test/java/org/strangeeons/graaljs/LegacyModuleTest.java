@@ -89,7 +89,7 @@ class LegacyModuleTest {
         try (ScriptSession s = new GraalJSLanguage().createSession()) {
             ScriptException e = assertThrows(ScriptException.class,
                     () -> s.eval("import 'strange-eons/legacy';", "test.mjs"));
-            assertTrue(e.getMessage().contains("ca.cgjennings.apps.arkham.StrangeEons"), e.getMessage());
+            assertTrue(e.getMessage().contains("ca.cgjennings.apps.arkham"), e.getMessage());
         }
     }
 }

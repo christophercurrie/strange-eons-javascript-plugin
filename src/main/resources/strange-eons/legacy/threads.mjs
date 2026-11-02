@@ -3,6 +3,7 @@
 // A GraalJS context can only be entered by one thread at a time. A task that
 // runs while another thread is executing script code in the same session
 // fails with an IllegalStateException.
+import { Java } from "../internal/host.mjs";
 import { assertDispatchThread, string } from "./common.mjs";
 
 const BusyDialog = Java.type("ca.cgjennings.apps.arkham.BusyDialog");

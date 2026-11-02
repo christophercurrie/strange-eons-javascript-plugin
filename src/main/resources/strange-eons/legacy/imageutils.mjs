@@ -1,4 +1,5 @@
 // Bitmapped image support, adapted from Strange Eons' imageutils.js.
+import { Java } from "../internal/host.mjs";
 import { Eons, ResourceKit, Settings, string } from "./common.mjs";
 
 export const BufferedImage = Java.type("java.awt.image.BufferedImage");

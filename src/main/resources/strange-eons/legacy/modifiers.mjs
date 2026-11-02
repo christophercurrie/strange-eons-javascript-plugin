@@ -1,4 +1,5 @@
 // Modifier key bitmasks, adapted from Strange Eons' modifiers.js.
+import { Java } from "../internal/host.mjs";
 const PluginContext = Java.type("ca.cgjennings.apps.arkham.plugins.PluginContext");
 
 export const SHIFT = PluginContext.SHIFT;

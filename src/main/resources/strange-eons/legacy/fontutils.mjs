@@ -1,4 +1,5 @@
 // Font lookup and registration, adapted from Strange Eons' fontutils.js.
+import { Java } from "../internal/host.mjs";
 import { currentSettings, Language, ResourceKit } from "./common.mjs";
 
 const GraphicsEnvironment = Java.type("java.awt.GraphicsEnvironment");

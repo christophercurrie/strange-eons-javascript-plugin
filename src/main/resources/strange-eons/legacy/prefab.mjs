@@ -1,4 +1,5 @@
 // Minimal DIY components, adapted from Strange Eons' prefab.js.
+import { Java } from "../internal/host.mjs";
 import { $, gstring, string } from "./common.mjs";
 import { FaceStyle } from "./diy.mjs";
 import { LAYOUT_CENTER, LAYOUT_MIDDLE, LAYOUT_TOP, markupBox } from "./markup.mjs";

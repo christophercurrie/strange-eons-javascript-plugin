@@ -1,4 +1,5 @@
 // UI control helpers, adapted from Strange Eons' uicontrols.js.
+import { Java } from "../internal/host.mjs";
 import { assertDispatchThread, Language, ResourceKit } from "./common.mjs";
 
 const pkg = "ca.cgjennings.apps.arkham";

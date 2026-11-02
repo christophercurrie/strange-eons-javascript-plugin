@@ -1,13 +1,91 @@
 // Core script library functions, adapted from Strange Eons' common.js.
+import { Java, facade } from "../internal/host.mjs";
 
-export const Eons = Java.type("ca.cgjennings.apps.arkham.StrangeEons");
-export const ResourceKit = Java.type("resources.ResourceKit");
-export const Language = Java.type("resources.Language");
-export const Settings = Java.type("resources.Settings");
-export const Color = Java.type("resources.Settings$Colour");
+export const Eons = facade("ca.cgjennings.apps.arkham.StrangeEons", {
+    constants: [
+        "MARKUP_TARGET_PROPERTY", "RECOMMENDED_MEMORY_IN_MB", "log"
+    ],
+    methods: [
+        "addEditor", "getActiveEditor", "getActiveGameComponent", "getApplication",
+        "getBuildNumber", "getEditionNumber", "getLogEntries", "getOpenProject",
+        "getRegisteredExportContainers", "getReleaseType", "getSafeStartupParentWindow",
+        "getScriptRunner", "getUrlForDocPage", "getUserStorageFile", "getVersionString",
+        "getWindow", "isNonInteractive", "main", "registerExportContainer", "setWaitCursor",
+        "testJavaVersion", "unregisterExportContainer"
+    ]
+});
+export const ResourceKit = facade("resources.ResourceKit", {
+    methods: [
+        "composeResourceURL", "createBleedBanner", "createCustomCursor",
+        "createPrintRequestAttributeSet", "createWaitIcon", "enableKerningAndLigatures",
+        "estimateDesktopScalingFactor", "findAvailableFontFamily", "findResourceInProject",
+        "getBodyFamily", "getBodyFont", "getEditorFont", "getFont", "getGameComponentFromFile",
+        "getGameComponentFromStream", "getIcon", "getIdentifier", "getImage",
+        "getImageQuietly", "getImagesQuietly", "getInputStream", "getMicroversionString",
+        "getMissingImage", "getMissingVectorImage", "getRegisteredCacheMetrics",
+        "getThemedImage", "getTinyFont", "getVectorIcon", "getVectorImage",
+        "initializeFileDialogs", "isFamilyRegistered", "isResourceStatic",
+        "makeStringFileSafe", "makeStringHTMLSafe", "missingKeyError",
+        "normalizeFontFamilyName", "normalizeResourceIdentifier", "prepareNewImage",
+        "registerCacheMetrics", "registerFont", "registerFontFamily",
+        "showBitmapImageFileDialog", "showFolderDialog", "showGenericExportFileDialog",
+        "showGenericOpenDialog", "showGenericSaveDialog", "showImageFileDialog",
+        "showMultiOpenDialog", "showOpenDialog", "showPluginFileDialog", "showPrintDialog",
+        "showProjectFolderDialog", "showSaveDialog", "showScriptFileDialog",
+        "showZipFileDialog", "unregisterCacheMetrics", "writeGameComponentToFile"
+    ]
+});
+export const Language = facade("resources.Language", {
+    methods: [
+        "addGameLocale", "addInterfaceLocale", "getGame", "getGameLocale", "getGameLocales",
+        "getIconForCountry", "getIconForLanguage", "getIconForLocale", "getInterface",
+        "getInterfaceLocale", "getInterfaceLocales", "getLocales", "gstring",
+        "isLocaleDescriptionValid", "parseLocaleDescription", "setGameLocale",
+        "setInterfaceLocale", "string"
+    ],
+    constructible: true
+});
+export const Settings = facade("resources.Settings", {
+    constants: [
+        "DEBUG_LISTENER"
+    ],
+    methods: [
+        "color", "colour", "cupShape", "forProperties", "getShared", "getUser", "integer",
+        "number", "region", "region2D", "textAlignment", "textStyle", "tint", "yesNo"
+    ],
+    constructible: true
+});
+export const Color = facade("resources.Settings$Colour", {
+    constants: [
+        "BITMASK", "BLACK", "BLUE", "CYAN", "DARK_GRAY", "GRAY", "GREEN", "LIGHT_GRAY",
+        "MAGENTA", "OPAQUE", "ORANGE", "PINK", "RED", "TRANSLUCENT", "WHITE", "YELLOW",
+        "black", "blue", "cyan", "darkGray", "gray", "green", "lightGray", "magenta", "orange",
+        "pink", "red", "white", "yellow"
+    ],
+    methods: [
+        "HSBtoRGB", "RGBtoHSB", "decode", "from", "getColor", "getHSBColor"
+    ],
+    constructible: true
+});
 export const Colour = Color;
-export const Region = Java.type("resources.Settings$Region");
-export const Region2D = Java.type("resources.Settings$Region2D");
+export const Region = facade("resources.Settings$Region", {
+    constants: [
+        "OUT_BOTTOM", "OUT_LEFT", "OUT_RIGHT", "OUT_TOP"
+    ],
+    methods: [
+        "intersect", "union"
+    ],
+    constructible: true
+});
+export const Region2D = facade("resources.Settings$Region2D", {
+    constants: [
+        "OUT_BOTTOM", "OUT_LEFT", "OUT_RIGHT", "OUT_TOP"
+    ],
+    methods: [
+        "intersect", "union"
+    ],
+    constructible: true
+});
 export const Font = Java.type("java.awt.Font");
 export const URL = Java.type("java.net.URL");
 

@@ -1,8 +1,13 @@
 package org.strangeeons.graaljs;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.SourceSection;
@@ -23,10 +28,12 @@ import org.strangeeons.scripts.ScriptSession;
  * {@code export function initialize() {}} in a module.
  *
  * <h2>Host access</h2>
- * Plug-ins are trusted code, as they are under Strange Rhino: the context
- * gets full host access ({@code Java.type}, IO, threads). Java classes are
- * looked up through this plug-in's own classloader, whose ancestors are the
- * SE library tier and the application.
+ * Plug-ins remain trusted code with IO and threads, but this boundary keeps
+ * them on the supported API; it is not a sandbox. Scripts look up classes
+ * through a filtered {@code Java} global that excludes application classes,
+ * and reach the application through {@code strange-eons/legacy}. Objects that
+ * library returns keep their public methods. {@code Object.getClass} and
+ * reflection are denied for all code in the context.
  *
  * <h2>Threading</h2>
  * A JS context cannot be entered by two threads at once. Entry points are
@@ -39,24 +46,41 @@ final class GraalJSSession implements ScriptSession {
     private static final String JS = "js";
     private static final String MODULE_MIME = "application/javascript+module";
 
+    private static final HostAccess HOST_ACCESS = HostAccess.newBuilder(HostAccess.ALL)
+            .denyAccess(Object.class, false)
+            .denyAccess(Class.class)
+            .denyAccess(ClassLoader.class)
+            .denyAccess(Field.class)
+            .denyAccess(Method.class)
+            .denyAccess(Constructor.class)
+            .denyAccess(MethodHandles.class)
+            .denyAccess(MethodHandles.Lookup.class)
+            .build();
+
     private final Context context;
     private final AtomicBoolean closed = new AtomicBoolean();
     /** Namespace object of the last module evaluated, or null. */
     private Value exports;
 
     GraalJSSession(Engine engine, ClassLoader hostClassLoader) {
+        BundledModuleFileSystem fileSystem = new BundledModuleFileSystem(hostClassLoader);
         context = Context.newBuilder(JS)
                 .engine(engine)
                 .allowAllAccess(true)
-                .allowIO(IOAccess.newBuilder()
-                        .fileSystem(new BundledModuleFileSystem(hostClassLoader))
-                        .build())
+                .allowHostAccess(HOST_ACCESS)
+                .allowHostClassLoading(false)
+                .allowIO(IOAccess.newBuilder().fileSystem(fileSystem).build())
                 .hostClassLoader(hostClassLoader)
                 // Make eval() of a module return its namespace object so
                 // exported functions are reachable from call().
                 .allowExperimentalOptions(true)
                 .option("js.esm-eval-returns-exports", "true")
+                .option("js.java-package-globals", "false")
+                .option("js.polyglot-builtin", "false")
                 .build();
+        context.eval(Source.newBuilder(JS, "import 'strange-eons/internal/host';", "<host boundary>")
+                .mimeType(MODULE_MIME).buildLiteral());
+        fileSystem.seal();
     }
 
     @Override
