@@ -46,6 +46,15 @@ export const HighResolutionMode = facade("ca.cgjennings.apps.arkham.diy.DIY$High
         "valueOf", "values"
     ]
 });
+export const DefaultPortrait = facade("ca.cgjennings.apps.arkham.component.DefaultPortrait", {
+    constants: [
+        "MAXIMUM_SHEET_INDEX"
+    ],
+    constructible: true
+});
+export const ListItem = facade("ca.cgjennings.apps.arkham.diy.ListItem", {
+    callable: true
+});
 
 /**
  * Opens a test editor for a component. {@code handlers} holds the functions a

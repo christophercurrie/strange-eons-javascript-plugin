@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -14,7 +16,7 @@ import org.strangeeons.scripts.ScriptSession;
 
 class HostBoundaryTest {
 
-    private static final String FIXTURE = "import { hiddenClassName, Hidden, Inherited, InterfaceConstant, Sealed } from 'strange-eons/privileged-fixture';";
+    private static final String FIXTURE = "import { Callable, hiddenClassName, Hidden, Inherited, InterfaceConstant, Sealed, view, WithProperty } from 'strange-eons/privileged-fixture';";
 
     private static Object eval(String source, String name) throws ScriptException {
         try (ScriptSession s = new GraalJSLanguage().createSession()) {
@@ -23,9 +25,31 @@ class HostBoundaryTest {
     }
 
     private static Object moduleResult(String body) throws ScriptException {
+        return moduleResult(body, null);
+    }
+
+    private static Object moduleResult(String body, Object db) throws ScriptException {
         try (ScriptSession s = new GraalJSLanguage().createSession()) {
+            s.bind("db", db);
             s.eval(FIXTURE + " export function result() { " + body + " }", "test.mjs");
             return s.call("result");
+        }
+    }
+
+    /** Has the methods of the application's named object database. */
+    public static final class Database {
+        public final Map<String, Object> objects = new HashMap<>();
+
+        public Object getObject(String name) {
+            return objects.get(name);
+        }
+
+        public void putObject(String name, Object object) {
+            objects.put(name, object);
+        }
+
+        public void removeObject(String name) {
+            objects.remove(name);
         }
     }
 
@@ -174,6 +198,52 @@ class HostBoundaryTest {
         assertEquals("java.lang.Object", hierarchy[hierarchy.length - 1]);
         assertEquals("javax.swing.SwingConstants", HostClasses.declaringClass("javax.swing.JSeparator", "VERTICAL"));
         assertThrows(IllegalArgumentException.class, () -> HostClasses.declaringClass("java.lang.String", "nothing"));
+    }
+
+    @Test
+    void callableFacadeConstructsWithOrWithoutNew() throws ScriptException {
+        assertEquals(true, moduleResult("return Callable() instanceof Callable && new Callable() instanceof Callable;"));
+    }
+
+    @Test
+    void facadeExposesComputedProperties() throws ScriptException {
+        assertEquals(42, moduleResult("return WithProperty.answer;"));
+        assertThrows(ScriptException.class, () -> moduleResult("WithProperty.answer = 1;"));
+        assertThrows(ScriptException.class, () -> moduleResult("return new WithProperty();"));
+    }
+
+    @Test
+    void namedObjectViewReadsWritesAndRemoves() throws ScriptException {
+        Database db = new Database();
+        assertEquals("ok 3 true", moduleResult("""
+                const v = view(db);
+                v.Game = { count: 3, label() { return 'ok'; } };
+                return `${v.Game.label()} ${v.Game.count} ${'Game' in v}`;
+                """, db));
+        assertTrue(db.objects.containsKey("Game"));
+
+        assertEquals("null false undefined", moduleResult("""
+                const v = view(db);
+                delete v.Game;
+                return `${v.Game} ${'Game' in v} ${v[Symbol.iterator]}`;
+                """, db));
+        assertTrue(db.objects.isEmpty());
+    }
+
+    @Test
+    void namedObjectViewRejectsSymbolsAndDefinitions() throws ScriptException {
+        Database db = new Database();
+        assertEquals(true, moduleResult("""
+                const v = view(db);
+                const key = Symbol('k');
+                let refused = false;
+                try { v[key] = 1; } catch (e) { refused = e instanceof TypeError; }
+                delete v[key];
+                return refused && !(key in v);
+                """, db));
+        assertThrows(ScriptException.class,
+                () -> moduleResult("Object.defineProperty(view(db), 'x', { value: 1 });", db));
+        assertTrue(db.objects.isEmpty());
     }
 
     @Test

@@ -54,17 +54,20 @@ const hostClasses = () => realJava.type("org.strangeeons.graaljs.HostClasses");
 
 /**
  * Creates the plug-in facing form of an application class, exposing only the
- * listed static members. It supports {@code instanceof}, and {@code new} when
- * {@code constructible} is set.
+ * listed static members and the read-only {@code properties}, each given by a
+ * function that computes its value. It supports {@code instanceof}, and
+ * {@code new} when {@code constructible} is set. A {@code callable} facade also
+ * constructs when called without {@code new}, as Strange Rhino allows.
  */
-export function facade(className, { constants = [], methods = [], constructible = false } = {}) {
+export function facade(className,
+        { constants = [], methods = [], properties = {}, constructible = false, callable = false } = {}) {
     let cached;
     const type = () => (cached ??= realJava.type(className));
     // Java.type exposes declared statics only, so inherited members are read
     // from the class that declares them.
     const owner = (name) => realJava.type(hostClasses().declaringClass(className, name));
     const target = function (...args) {
-        if (!new.target || !constructible) {
+        if (!(constructible || callable) || (!new.target && !callable)) {
             throw new TypeError(className + " cannot be called or constructed here");
         }
         return new (type())(...args);
@@ -76,6 +79,9 @@ export function facade(className, { constants = [], methods = [], constructible 
     }
     for (const name of methods) {
         Object.defineProperty(target, name, { value: (...args) => owner(name)[name](...args), enumerable: true });
+    }
+    for (const [name, get] of Object.entries(properties)) {
+        Object.defineProperty(target, name, { get, enumerable: true });
     }
     return Object.freeze(target);
 }

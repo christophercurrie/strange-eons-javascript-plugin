@@ -1,4 +1,5 @@
 import { Java, facade } from "./internal/host.mjs";
+import { namedObjectView } from "./internal/named-objects.mjs";
 
 const Exception = Java.type("org.strangeeons.scripts.ScriptException");
 export const hiddenClassName = () => new Exception("hidden").getMessage();
@@ -13,3 +14,10 @@ export const Inherited = facade("java.util.LinkedHashMap", {
 export const InterfaceConstant = facade("javax.swing.JSeparator", {
     constants: ["VERTICAL"]
 });
+export const Callable = facade("java.util.ArrayList", {
+    callable: true
+});
+export const WithProperty = facade("java.util.ArrayList", {
+    properties: { answer: () => 42 }
+});
+export const view = namedObjectView;

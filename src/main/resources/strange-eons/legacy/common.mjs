@@ -1,5 +1,6 @@
 // Core script library functions, adapted from Strange Eons' common.js.
 import { Java, facade } from "../internal/host.mjs";
+import { namedObjectView } from "../internal/named-objects.mjs";
 
 export const Eons = facade("ca.cgjennings.apps.arkham.StrangeEons", {
     constants: [
@@ -12,8 +13,17 @@ export const Eons = facade("ca.cgjennings.apps.arkham.StrangeEons", {
         "getScriptRunner", "getUrlForDocPage", "getUserStorageFile", "getVersionString",
         "getWindow", "isNonInteractive", "main", "registerExportContainer", "setWaitCursor",
         "testJavaVersion", "unregisterExportContainer"
-    ]
+    ],
+    properties: {
+        namedObjects: () => namedObjects()
+    }
 });
+
+let namedObjectsView;
+function namedObjects() {
+    return (namedObjectsView ??= namedObjectView(
+            Java.type("ca.cgjennings.apps.arkham.StrangeEons").getApplication().getNamedObjects()));
+}
 export const ResourceKit = facade("resources.ResourceKit", {
     methods: [
         "composeResourceURL", "createBleedBanner", "createCustomCursor",
