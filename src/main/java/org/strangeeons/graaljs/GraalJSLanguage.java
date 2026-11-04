@@ -4,6 +4,8 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.strangeeons.scripts.ScriptException;
 import org.strangeeons.scripts.ScriptLanguage;
 import org.strangeeons.scripts.ScriptSession;
 
@@ -43,6 +45,31 @@ public final class GraalJSLanguage implements ScriptLanguage {
     @Override
     public Set<String> fileExtensions() {
         return Set.of(".mjs");
+    }
+
+    private static final System.Logger LOG = System.getLogger(GraalJSLanguage.class.getName());
+    private static final AtomicInteger PREPARED = new AtomicInteger();
+
+    /**
+     * Starts the shared engine and loads the script library in a session that
+     * is then closed. Later sessions reuse the parsed library, so the first
+     * component opens about as fast as the rest. Runs once per JVM.
+     */
+    @Override
+    public void prepare() {
+        if (PREPARED.getAndIncrement() > 0) {
+            return;
+        }
+        try (ScriptSession session = createSession()) {
+            session.eval("import 'strange-eons/legacy';", "<prepare>.mjs");
+        } catch (ScriptException e) {
+            LOG.log(System.Logger.Level.WARNING, "could not load the script library ahead of use", e);
+        }
+    }
+
+    /** How many times {@link #prepare()} has been called, for tests. */
+    static int prepareCalls() {
+        return PREPARED.get();
     }
 
     @Override
