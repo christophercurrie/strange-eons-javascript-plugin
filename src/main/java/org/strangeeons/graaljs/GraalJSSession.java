@@ -77,6 +77,11 @@ final class GraalJSSession implements ScriptSession {
                 .option("js.esm-eval-returns-exports", "true")
                 .option("js.java-package-globals", "false")
                 .option("js.polyglot-builtin", "false")
+                // Bean getters and setters read as properties, as in Rhino;
+                // compat mode otherwise falls back to ES5 and drops Intl.
+                .option("js.nashorn-compat", "true")
+                .option("js.ecmascript-version", "latest")
+                .option("js.intl-402", "true")
                 .build();
         context.eval(Source.newBuilder(JS, "import 'strange-eons/internal/host';", "<host boundary>")
                 .mimeType(MODULE_MIME).buildLiteral());

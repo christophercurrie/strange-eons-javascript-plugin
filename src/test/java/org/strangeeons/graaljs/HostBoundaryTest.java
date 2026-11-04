@@ -53,6 +53,23 @@ class HostBoundaryTest {
         }
     }
 
+    /** Has a bean property and a boolean bean property. */
+    public static final class Bean {
+        private String name = "a";
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public boolean isOn() {
+            return true;
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
         "org.strangeeons.scripts.ScriptException",
@@ -91,9 +108,25 @@ class HostBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"Packages", "java", "javax", "Polyglot"})
+    @ValueSource(strings = {"Packages", "java", "javax", "Polyglot", "exit", "quit", "JSAdapter", "parseToJSON"})
     void packageGlobalsAreAbsent(String global) throws ScriptException {
         assertEquals("undefined", eval("typeof " + global, "t.js"));
+    }
+
+    @Test
+    void objectBindPropertiesIsAbsent() throws ScriptException {
+        assertEquals("undefined", eval("typeof Object.bindProperties", "t.js"));
+    }
+
+    @Test
+    void beanPropertiesReadAndWrite() throws ScriptException {
+        Bean bean = new Bean();
+        assertEquals("a true", moduleResult("""
+                const r = `${db.name} ${db.on}`;
+                db.name = 'b';
+                return r;
+                """, bean));
+        assertEquals("b", bean.getName());
     }
 
     @Test

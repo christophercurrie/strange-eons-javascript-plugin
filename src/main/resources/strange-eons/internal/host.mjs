@@ -48,6 +48,12 @@ Object.defineProperty(globalThis, "Java", {
     enumerable: false
 });
 
+// Nashorn compatibility mode adds bean properties, plus these extras.
+for (const name of ["exit", "quit", "JSAdapter", "parseToJSON"]) {
+    delete globalThis[name];
+}
+delete Object.bindProperties;
+
 export const Java = realJava;
 
 const hostClasses = () => realJava.type("org.strangeeons.graaljs.HostClasses");
