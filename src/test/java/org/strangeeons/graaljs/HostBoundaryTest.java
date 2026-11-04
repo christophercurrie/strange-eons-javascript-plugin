@@ -90,9 +90,19 @@ class HostBoundaryTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"java.util.ArrayList", "javax.swing.JLabel", "java.lang.String", "java.awt.Color"})
+    @ValueSource(strings = {"java.util.ArrayList", "javax.swing.JLabel", "java.lang.String", "java.awt.Color",
+        "javax.imageio.IIOException"})
     void javaTypeAllowsSupportedJdkClasses(String className) throws ScriptException {
         assertEquals(true, eval("Java.isType(Java.type('" + className + "'))", "t.js"));
+    }
+
+    @Test
+    void javaTypeAllowsImageFilters() throws ScriptException {
+        // the app's classes are not on this classpath, so the lookup passes the boundary and then fails
+        Object message = eval("""
+                try { Java.type('ca.cgjennings.graphics.filters.InversionFilter'); } catch (e) { String(e); }
+                """, "t.js");
+        assertTrue(!String.valueOf(message).contains("not available to plug-in scripts"), String.valueOf(message));
     }
 
     @Test
@@ -127,6 +137,11 @@ class HostBoundaryTest {
                 return r;
                 """, bean));
         assertEquals("b", bean.getName());
+    }
+
+    @Test
+    void numbersNarrowToFloatParameters() throws ScriptException {
+        assertEquals((double) 0.8f, eval("new (Java.type('java.awt.BasicStroke'))(0.8).getLineWidth()", "t.js"));
     }
 
     @Test

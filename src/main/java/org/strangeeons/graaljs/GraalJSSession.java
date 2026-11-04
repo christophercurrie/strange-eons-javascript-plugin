@@ -63,6 +63,9 @@ final class GraalJSSession implements ScriptSession {
             .denyAccess(Constructor.class)
             .denyAccess(MethodHandles.class)
             .denyAccess(MethodHandles.Lookup.class)
+            // Rhino narrows any number to a float parameter; GraalJS refuses lossy conversions
+            .targetTypeMapping(Double.class, Float.class, null, Double::floatValue,
+                    HostAccess.TargetMappingPrecedence.LOWEST)
             .build();
 
     private static final String RESOURCE_SCHEME = "res://";

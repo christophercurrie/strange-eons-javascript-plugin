@@ -40,10 +40,23 @@ export const TextStyle = facade("ca.cgjennings.layout.TextStyle", {
     constructible: true
 });
 export const TextAttribute = Java.type("java.awt.font.TextAttribute");
+const pageShape = (name) => facade("ca.cgjennings.layout.PageShape$" + name, { constructible: true });
+const CompoundShape = pageShape("CompoundShape");
+const CupShape = pageShape("CupShape");
+const GeometricShape = pageShape("GeometricShape");
+const InsetShape = pageShape("InsetShape");
+const MergedShape = pageShape("MergedShape");
 export const PageShape = facade("ca.cgjennings.layout.PageShape", {
     constants: [
         "RECTANGLE_SHAPE"
     ],
+    properties: {
+        CompoundShape: () => CompoundShape,
+        CupShape: () => CupShape,
+        GeometricShape: () => GeometricShape,
+        InsetShape: () => InsetShape,
+        MergedShape: () => MergedShape
+    },
     constructible: true
 });
 
@@ -54,7 +67,7 @@ export function markupBox(sheet, genderAware) {
     const ppi = isSheet ? sheet.getTemplateResolution() : sheet;
     const renderer = genderAware ? new GenderMarkupBox(ppi) : new MarkupBox(ppi);
     if (isSheet) {
-        sheet.doStandardRendererInitialization(renderer);
+        Sheet.doStandardRendererInitialization(renderer);
     }
     return renderer;
 }

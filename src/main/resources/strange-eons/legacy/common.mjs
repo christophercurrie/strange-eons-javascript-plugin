@@ -96,6 +96,12 @@ export const Region2D = facade("resources.Settings$Region2D", {
     ],
     constructible: true
 });
+export const StrangeImage = facade("resources.StrangeImage", {
+    methods: [
+        "create", "exists", "get", "getAsBufferedImage", "getInvisibleImage", "getMissingImage",
+        "identifierToURL", "isFileIdentifier"
+    ]
+});
 export const Font = Java.type("java.awt.Font");
 export const URL = Java.type("java.net.URL");
 

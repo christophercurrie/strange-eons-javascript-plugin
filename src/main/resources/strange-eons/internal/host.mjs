@@ -5,7 +5,8 @@ const realJava = globalThis.Java;
 
 const ALLOWED = [
     /^java\.(awt|io|math|net|nio|text|time|util)\./,
-    /^javax\.swing\./,
+    /^javax\.(imageio|swing)\./,
+    /^ca\.cgjennings\.graphics\.filters\./,
     /^java\.lang\.(Boolean|Byte|Character|Double|Float|Integer|Long|Math|Number|Short|StrictMath|String|StringBuilder)$/
 ];
 const DENIED = /^java\.(net\.URLClassLoader|util\.ServiceLoader)(\$|$)/;
