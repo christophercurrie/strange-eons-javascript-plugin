@@ -26,8 +26,8 @@ jobs:
       - run: ./gradlew check sePlugin
       - uses: actions/upload-artifact@v7
         with:
-          name: GraalJSLanguage
-          path: build/libs/GraalJSLanguage.selibrary
+          name: ECMAScriptLanguage
+          path: build/libs/ECMAScriptLanguage.selibrary
           if-no-files-found: error
 
   release:
@@ -47,9 +47,9 @@ jobs:
           fi
       - uses: actions/download-artifact@v8
         with:
-          name: GraalJSLanguage
+          name: ECMAScriptLanguage
           path: dist
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/GraalJSLanguage.selibrary --verify-tag --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" dist/ECMAScriptLanguage.selibrary --verify-tag --generate-notes

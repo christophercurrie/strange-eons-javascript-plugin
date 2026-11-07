@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "org.strangeeons.plugins"
-description = "Registers GraalJS (modern ECMAScript) as a scripting language with Strange Eons."
+description = "Registers modern ECMAScript as a scripting language with Strange Eons."
 
 java {
     toolchain {
@@ -76,7 +76,7 @@ tasks.test {
 // discovers languages and its runtime through META-INF/services, so package
 // names must not change.
 strangeEonsPlugin {
-    bundleName = "GraalJSLanguage"
+    bundleName = "ECMAScriptLanguage"
 }
 
 tasks.sePlugin {
