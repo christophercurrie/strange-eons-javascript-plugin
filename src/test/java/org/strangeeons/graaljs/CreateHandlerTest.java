@@ -134,6 +134,18 @@ class CreateHandlerTest {
     }
 
     @Test
+    void resourceEntryModuleResolvesRelativeImports() throws Exception {
+        write("p/lib/info.mjs", "export const name = 'Plug-in';");
+        write("p/entry.mjs", """
+                import { name } from './lib/info.mjs';
+                export function getName() { return name; }""");
+
+        session.eval("ignored: the module is read from its resource", "res://p/entry.mjs");
+        assertEquals("Plug-in", session.call("getName"));
+        assertNull(session.callIfDefined("initialize"));
+    }
+
+    @Test
     void reportsMissingModuleAsFileNotFound() {
         ScriptException e = assertThrows(ScriptException.class,
                 () -> session.createHandler("missing.mjs:Card", Card.class));

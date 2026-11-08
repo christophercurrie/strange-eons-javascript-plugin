@@ -6,7 +6,10 @@ const realJava = globalThis.Java;
 const ALLOWED = [
     /^java\.(awt|io|math|net|nio|text|time|util)\./,
     /^javax\.(imageio|swing)\./,
-    /^ca\.cgjennings\.graphics\.filters\./,
+    /^ca\.cgjennings\.(graphics|ui)\./,
+    /^ca\.cgjennings\.platform\.PlatformSupport$/,
+    /^java\.beans\.(PropertyChangeEvent|PropertyChangeListener)$/,
+    /^net\.miginfocom\./,
     /^java\.lang\.(Boolean|Byte|Character|Double|Float|Integer|Long|Math|Number|Short|StrictMath|String|StringBuilder)$/
 ];
 const DENIED = /^java\.(net\.URLClassLoader|util\.ServiceLoader)(\$|$)/;
@@ -36,9 +39,29 @@ function requireAllowedArrayType(typeName) {
     return name;
 }
 
+// application classes that facades let plug-ins extend, by facade
+const extensible = new WeakMap();
+
+// the host type to extend: an allowed Java type, or an extensible facade
+function extensionBase(type) {
+    if (extensible.has(type)) {
+        return realJava.type(extensible.get(type));
+    }
+    if (!realJava.isType(type)) {
+        throw new TypeError("not a Java type: " + type);
+    }
+    return realJava.type(requireAllowed(hostClasses().name(type)));
+}
+
 Object.defineProperty(globalThis, "Java", {
     value: Object.freeze({
         type: (className) => realJava.type(requireAllowed(className)),
+        // the last argument may be an object of method overrides
+        extend: (...args) => {
+            const overrides = args.length > 1 && !realJava.isType(args[args.length - 1])
+                    && !extensible.has(args[args.length - 1]) ? [args.pop()] : [];
+            return realJava.extend(...args.map(extensionBase), ...overrides);
+        },
         to: (value, typeName) => realJava.to(value, requireAllowedArrayType(typeName)),
         from: (value) => realJava.from(value),
         isJavaObject: (value) => realJava.isJavaObject(value),
@@ -64,10 +87,11 @@ const hostClasses = () => realJava.type("org.strangeeons.graaljs.HostClasses");
  * listed static members and the read-only {@code properties}, each given by a
  * function that computes its value. It supports {@code instanceof}, and
  * {@code new} when {@code constructible} is set. A {@code callable} facade also
- * constructs when called without {@code new}, as Strange Rhino allows.
+ * constructs when called without {@code new}, as Strange Rhino allows. An
+ * {@code extensible} facade can be passed to {@code Java.extend}.
  */
-export function facade(className,
-        { constants = [], methods = [], properties = {}, constructible = false, callable = false } = {}) {
+export function facade(className, { constants = [], methods = [], properties = {}, constructible = false,
+        callable = false, extensible: canExtend = false } = {}) {
     let cached;
     const type = () => (cached ??= realJava.type(className));
     // Java.type exposes declared statics only, so inherited members are read
@@ -89,6 +113,9 @@ export function facade(className,
     }
     for (const [name, get] of Object.entries(properties)) {
         Object.defineProperty(target, name, { get, enumerable: true });
+    }
+    if (canExtend) {
+        extensible.set(target, className);
     }
     return Object.freeze(target);
 }

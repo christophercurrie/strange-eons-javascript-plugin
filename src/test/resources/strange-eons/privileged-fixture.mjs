@@ -20,4 +20,7 @@ export const Callable = facade("java.util.ArrayList", {
 export const WithProperty = facade("java.util.ArrayList", {
     properties: { answer: () => 42 }
 });
+export const Extensible = facade("java.util.AbstractList", {
+    extensible: true
+});
 export const view = namedObjectView;

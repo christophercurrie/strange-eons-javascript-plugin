@@ -8,24 +8,33 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.math.BigDecimal;
 import java.net.URL;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
-import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.SourceSection;
 import org.graalvm.polyglot.Value;
-import org.graalvm.polyglot.io.IOAccess;
 import org.strangeeons.scripts.ScriptException;
 import org.strangeeons.scripts.ScriptSession;
 
 /**
- * {@link ScriptSession} backed by one GraalJS {@link Context}.
+ * {@link ScriptSession} backed by a GraalJS context.
+ *
+ * <h2>Contexts</h2>
+ * A session runs in the {@link ModuleContext} of the first plug-in module it
+ * loads, by {@link #eval} of a {@code res://} module or by
+ * {@link #createHandler}: sessions that load modules from the same resource
+ * folder share a context, and with it module state. A session that first
+ * evaluates other source gets a context of its own. Bindings made before then
+ * are applied to the context when it is chosen.
  *
  * <h2>Scripts and modules</h2>
  * Sources whose name ends in {@code .mjs} are evaluated as ES modules; all
@@ -45,14 +54,14 @@ import org.strangeeons.scripts.ScriptSession;
  *
  * <h2>Threading</h2>
  * A JS context cannot be entered by two threads at once. Entry points are
- * synchronized on the session, so concurrent host calls serialize instead of
- * failing. {@link #close} is not synchronized: it cancels any running
- * script rather than waiting for it.
+ * synchronized on the context, so concurrent host calls from its sessions
+ * serialize instead of failing. Closing the last session of a context
+ * cancels any running script rather than waiting for it.
  */
 final class GraalJSSession implements ScriptSession {
 
-    private static final String JS = "js";
-    private static final String MODULE_MIME = "application/javascript+module";
+    private static final String JS = ModuleContext.JS;
+    private static final String MODULE_MIME = ModuleContext.MODULE_MIME;
 
     private static final HostAccess HOST_ACCESS = HostAccess.newBuilder(HostAccess.ALL)
             .denyAccess(Object.class, false)
@@ -64,98 +73,179 @@ final class GraalJSSession implements ScriptSession {
             .denyAccess(MethodHandles.class)
             .denyAccess(MethodHandles.Lookup.class)
             // Rhino narrows any number to a float parameter; GraalJS refuses lossy conversions
-            .targetTypeMapping(Double.class, Float.class, null, Double::floatValue,
+            // ahead of truncating it to an int, as Rhino ranks float above int
+            .targetTypeMapping(Double.class, Float.class, Objects::nonNull, Double::floatValue,
+                    HostAccess.TargetMappingPrecedence.LOW)
+            // truncates a number toward zero for an int or long parameter it fits
+            .targetTypeMapping(Double.class, Integer.class,
+                    d -> fitsInteger(d, Integer.MIN_VALUE, Integer.MAX_VALUE), d -> (int) (double) d,
+                    HostAccess.TargetMappingPrecedence.LOWEST)
+            .targetTypeMapping(Double.class, Long.class,
+                    d -> fitsInteger(d, Long.MIN_VALUE, Long.MAX_VALUE), d -> (long) (double) d,
+                    HostAccess.TargetMappingPrecedence.LOWEST)
+            // and passes a number to a String parameter as its script text
+            .targetTypeMapping(Value.class, String.class, Value::isNumber, n -> numberText(n.asDouble()),
                     HostAccess.TargetMappingPrecedence.LOWEST)
             .build();
 
     private static final String RESOURCE_SCHEME = "res://";
 
-    private final Context context;
-    private final BundledModuleFileSystem fileSystem;
-    private final AtomicBoolean closed = new AtomicBoolean();
+    /** Whether a number, truncated toward zero, lies in [min, max]; false for null. */
+    static boolean fitsInteger(Double d, double min, double max) {
+        if (d == null) {
+            return false;
+        }
+        double whole = d < 0 ? Math.ceil(d) : Math.floor(d);
+        return whole >= min && whole <= max;
+    }
+
+    /** A number as script code would convert it to a string. */
+    static String numberText(double d) {
+        if (Double.isNaN(d)) {
+            return "NaN";
+        }
+        if (Double.isInfinite(d)) {
+            return d > 0 ? "Infinity" : "-Infinity";
+        }
+        if (d == 0) {
+            return "0";
+        }
+        BigDecimal b = new BigDecimal(Double.toString(d)).stripTrailingZeros();
+        double a = Math.abs(d);
+        if (a >= 1e-6 && a < 1e21) {
+            return b.toPlainString();
+        }
+        String digits = b.unscaledValue().abs().toString();
+        int exponent = digits.length() - 1 - b.scale();
+        String mantissa = digits.length() == 1 ? digits : digits.charAt(0) + "." + digits.substring(1);
+        return (d < 0 ? "-" : "") + mantissa + "e" + (exponent < 0 ? "-" : "+") + Math.abs(exponent);
+    }
+
+    private final Engine engine;
+    private final ClassLoader hostClassLoader;
+    private final Function<String, URL> resources;
+    /** The context, once the session has chosen one; guarded by this. */
+    private ModuleContext context;
+    /** Bindings made before the context was chosen; guarded by this. */
+    private final Map<String, Object> pendingBindings = new LinkedHashMap<>();
+    private volatile boolean closed;
     /** Namespace object of the last module evaluated, or null. */
     private Value exports;
 
     GraalJSSession(Engine engine, ClassLoader hostClassLoader, Function<String, URL> resources) {
-        fileSystem = new BundledModuleFileSystem(hostClassLoader, resources);
-        context = Context.newBuilder(JS)
-                .engine(engine)
-                .allowAllAccess(true)
-                .allowHostAccess(HOST_ACCESS)
-                .allowHostClassLoading(false)
-                .allowIO(IOAccess.newBuilder().fileSystem(fileSystem).build())
-                .hostClassLoader(hostClassLoader)
-                // Make eval() of a module return its namespace object so
-                // exported functions are reachable from call().
-                .allowExperimentalOptions(true)
-                .option("js.esm-eval-returns-exports", "true")
-                .option("js.java-package-globals", "false")
-                .option("js.polyglot-builtin", "false")
-                // Bean getters and setters read as properties, as in Rhino;
-                // compat mode otherwise falls back to ES5 and drops Intl.
-                .option("js.nashorn-compat", "true")
-                .option("js.ecmascript-version", "latest")
-                .option("js.intl-402", "true")
-                .build();
-        context.eval(Source.newBuilder(JS, "import 'strange-eons/internal/host';", "<host boundary>")
-                .mimeType(MODULE_MIME).buildLiteral());
-        fileSystem.seal();
+        this.engine = engine;
+        this.hostClassLoader = hostClassLoader;
+        this.resources = resources;
     }
 
-    @Override
-    public synchronized Object eval(String source, String sourceName) throws ScriptException {
+    /**
+     * Returns the session's context, choosing it on first use: the shared
+     * context of {@code resourceName}'s folder, or a private one if it is
+     * {@code null}.
+     */
+    private synchronized ModuleContext context(String resourceName) throws ScriptException {
         ensureOpen();
-        boolean module = isModule(sourceName);
-        Source.Builder b = Source.newBuilder(JS, source, sourceName == null ? "<eval>" : sourceName);
-        if (module) {
-            b.mimeType(MODULE_MIME);
-        }
-        try {
-            Value result = context.eval(b.buildLiteral());
-            if (module) {
-                exports = result;
+        if (context == null) {
+            String folder = resourceName == null ? null : ModuleContext.folderOf(resourceName);
+            context = ModuleContext.acquire(folder, engine, hostClassLoader, resources, HOST_ACCESS);
+            synchronized (context) {
+                pendingBindings.forEach(context.context().getBindings(JS)::putMember);
             }
-            return toHost(result);
-        } catch (PolyglotException e) {
-            throw translate(e, sourceName);
+            pendingBindings.clear();
+        }
+        return context;
+    }
+
+    /** The resource name of a {@code res://} or plain resource path, or null for other names. */
+    private static String resourceName(String script) {
+        if (script == null) {
+            return null;
+        }
+        if (script.startsWith(RESOURCE_SCHEME)) {
+            return script.substring(RESOURCE_SCHEME.length());
+        }
+        return script.contains(":") ? null : script;
+    }
+
+    @Override
+    public Object eval(String source, String sourceName) throws ScriptException {
+        boolean module = isModule(sourceName);
+        boolean resource = module && sourceName.startsWith(RESOURCE_SCHEME);
+        ModuleContext mc = context(resource ? resourceName(sourceName) : null);
+        synchronized (mc) {
+            ensureOpen();
+            if (resource) {
+                // load the module by path, so its relative imports resolve
+                exports = moduleNamespace(mc, sourceName, sourceName);
+                return toHost(exports);
+            }
+            Source.Builder b = Source.newBuilder(JS, source, sourceName == null ? "<eval>" : sourceName);
+            if (module) {
+                b.mimeType(MODULE_MIME);
+            }
+            try {
+                Value result = mc.context().eval(b.buildLiteral());
+                if (module) {
+                    exports = result;
+                }
+                return toHost(result);
+            } catch (PolyglotException e) {
+                throw translate(e, sourceName);
+            }
         }
     }
 
     @Override
-    public synchronized Object call(String name, Object... args) throws ScriptException {
-        ensureOpen();
-        Value fn = resolve(name);
-        if (fn == null) {
-            throw new ScriptException("function not defined: " + name);
+    public Object call(String name, Object... args) throws ScriptException {
+        ModuleContext mc = context(null);
+        synchronized (mc) {
+            ensureOpen();
+            Value fn = resolve(mc, name);
+            if (fn == null) {
+                throw new ScriptException("function not defined: " + name);
+            }
+            return invoke(fn, name, args);
         }
-        return invoke(fn, name, args);
     }
 
     @Override
-    public synchronized Object callIfDefined(String name, Object... args) throws ScriptException {
-        ensureOpen();
-        Value fn = resolve(name);
-        return fn == null ? null : invoke(fn, name, args);
+    public Object callIfDefined(String name, Object... args) throws ScriptException {
+        ModuleContext mc = context(null);
+        synchronized (mc) {
+            ensureOpen();
+            Value fn = resolve(mc, name);
+            return fn == null ? null : invoke(fn, name, args);
+        }
     }
 
     @Override
-    public synchronized void bind(String name, Object value) {
-        if (closed.get()) {
-            throw new IllegalStateException("session is closed");
+    public void bind(String name, Object value) {
+        ModuleContext mc;
+        synchronized (this) {
+            if (closed) {
+                throw new IllegalStateException("session is closed");
+            }
+            if (context == null) {
+                pendingBindings.put(name, value);
+                return;
+            }
+            mc = context;
         }
-        context.getBindings(JS).putMember(name, value);
+        synchronized (mc) {
+            mc.context().getBindings(JS).putMember(name, value);
+        }
     }
 
     /**
      * Constructs a class exported by a plug-in module. The returned object
      * follows the conventions of Strange Rhino handlers: a method the class
      * doesn't define does nothing and returns zero or {@code null}, unless the
-     * interface gives it a default. Calls hold the session's lock, since a JS
+     * interface gives it a default. Calls hold the context's lock, since a JS
      * context cannot be entered by two threads at once, and do nothing once the
      * session is closed.
      */
     @Override
-    public synchronized <T> T createHandler(String spec, Class<T> type) throws ScriptException {
+    public <T> T createHandler(String spec, Class<T> type) throws ScriptException {
         ensureOpen();
         if (!type.isInterface()) {
             throw new ScriptException("not an interface: " + type.getName());
@@ -166,21 +256,26 @@ final class GraalJSSession implements ScriptSession {
         }
         String script = spec.substring(0, colon);
         String export = spec.substring(colon + 1);
-        Value constructor = exportedMember(script, export, spec);
-        if (constructor == null || !constructor.canInstantiate()) {
-            throw new ScriptException("module does not export a class: " + spec);
-        }
+        ModuleContext mc = context(resourceName(script));
         Value instance;
-        try {
-            instance = constructor.newInstance();
-        } catch (PolyglotException e) {
-            throw translate(e, spec);
+        synchronized (mc) {
+            ensureOpen();
+            Value constructor = moduleNamespace(mc, script, spec).getMember(export);
+            if (constructor == null || !constructor.canInstantiate()) {
+                throw new ScriptException("module does not export a class: " + spec);
+            }
+            try {
+                instance = constructor.newInstance();
+            } catch (PolyglotException e) {
+                throw translate(e, spec);
+            }
         }
         return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type},
-                (proxy, method, args) -> invokeHandler(instance, proxy, method, args)));
+                (proxy, method, args) -> invokeHandler(mc, instance, proxy, method, args)));
     }
 
-    private Value exportedMember(String script, String export, String spec) throws ScriptException {
+    /** Imports a plug-in module by resource name and returns its namespace. */
+    private static Value moduleNamespace(ModuleContext mc, String script, String spec) throws ScriptException {
         if (script.contains(":") && !script.startsWith(RESOURCE_SCHEME)) {
             throw new ScriptException("only res: and plain resource paths are supported: " + spec);
         }
@@ -191,20 +286,21 @@ final class GraalJSSession implements ScriptSession {
         } catch (InvalidPathException e) {
             throw new ScriptException(spec, e);
         }
-        if (!fileSystem.hasResource(path)) {
+        if (!mc.fileSystem().hasResource(path)) {
             throw new ScriptException(spec, new FileNotFoundException(script));
         }
         String specifier = path.toString().replace('\\', '/').replace("'", "\\'");
         Source source = Source.newBuilder(JS, "import * as handlerModule from '" + specifier + "';"
                 + " export { handlerModule };", "<handler module>").mimeType(MODULE_MIME).buildLiteral();
         try {
-            return context.eval(source).getMember("handlerModule").getMember(export);
+            return mc.context().eval(source).getMember("handlerModule");
         } catch (PolyglotException e) {
             throw translate(e, spec);
         }
     }
 
-    private Object invokeHandler(Value instance, Object proxy, Method method, Object[] args) throws Throwable {
+    private Object invokeHandler(ModuleContext mc, Value instance, Object proxy, Method method, Object[] args)
+            throws Throwable {
         if (method.getDeclaringClass() == Object.class) {
             return switch (method.getName()) {
                 case "equals" -> proxy == args[0];
@@ -212,9 +308,9 @@ final class GraalJSSession implements ScriptSession {
                 default -> "script handler of " + proxy.getClass().getInterfaces()[0].getName();
             };
         }
-        synchronized (this) {
+        synchronized (mc) {
             Class<?> returnType = method.getReturnType();
-            if (closed.get()) {
+            if (closed) {
                 return emptyValue(returnType);
             }
             if (!instance.canInvokeMember(method.getName())) {
@@ -240,11 +336,17 @@ final class GraalJSSession implements ScriptSession {
 
     @Override
     public void close() {
-        if (closed.compareAndSet(false, true)) {
+        ModuleContext mc;
+        synchronized (this) {
+            if (closed) {
+                return;
+            }
+            closed = true;
             exports = null;
-            // cancelIfExecuting = true: a runaway script must not be able to
-            // block plug-in unload.
-            context.close(true);
+            mc = context;
+        }
+        if (mc != null) {
+            mc.release();
         }
     }
 
@@ -252,14 +354,14 @@ final class GraalJSSession implements ScriptSession {
         return sourceName != null && sourceName.endsWith(".mjs");
     }
 
-    private Value resolve(String name) {
+    private Value resolve(ModuleContext mc, String name) {
         if (exports != null && exports.hasMember(name)) {
             Value v = exports.getMember(name);
             if (v != null && v.canExecute()) {
                 return v;
             }
         }
-        Value v = context.getBindings(JS).getMember(name);
+        Value v = mc.context().getBindings(JS).getMember(name);
         return v != null && v.canExecute() ? v : null;
     }
 
@@ -272,7 +374,7 @@ final class GraalJSSession implements ScriptSession {
     }
 
     private void ensureOpen() throws ScriptException {
-        if (closed.get()) {
+        if (closed) {
             throw new ScriptException("session is closed");
         }
     }

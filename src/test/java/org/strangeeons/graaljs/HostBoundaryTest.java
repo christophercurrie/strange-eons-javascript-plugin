@@ -1,6 +1,7 @@
 package org.strangeeons.graaljs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,7 +17,7 @@ import org.strangeeons.scripts.ScriptSession;
 
 class HostBoundaryTest {
 
-    private static final String FIXTURE = "import { Callable, hiddenClassName, Hidden, Inherited, InterfaceConstant, Sealed, view, WithProperty } from 'strange-eons/privileged-fixture';";
+    private static final String FIXTURE = "import { Callable, Extensible, hiddenClassName, Hidden, Inherited, InterfaceConstant, Sealed, view, WithProperty } from 'strange-eons/privileged-fixture';";
 
     private static Object eval(String source, String name) throws ScriptException {
         try (ScriptSession s = new GraalJSLanguage().createSession()) {
@@ -80,6 +81,9 @@ class HostBoundaryTest {
         "java.lang.System",
         "java.lang.Thread",
         "java.lang.reflect.Method",
+        "ca.cgjennings.apps.arkham.StrangeEons",
+        "java.beans.Beans",
+        "java.beans.Introspector",
         "java.lang.invoke.MethodHandles",
         "java.net.URLClassLoader",
         "java.util.ServiceLoader"
@@ -91,7 +95,7 @@ class HostBoundaryTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"java.util.ArrayList", "javax.swing.JLabel", "java.lang.String", "java.awt.Color",
-        "javax.imageio.IIOException"})
+        "javax.imageio.IIOException", "java.beans.PropertyChangeListener", "java.beans.PropertyChangeEvent"})
     void javaTypeAllowsSupportedJdkClasses(String className) throws ScriptException {
         assertEquals(true, eval("Java.isType(Java.type('" + className + "'))", "t.js"));
     }
@@ -103,6 +107,32 @@ class HostBoundaryTest {
                 try { Java.type('ca.cgjennings.graphics.filters.InversionFilter'); } catch (e) { String(e); }
                 """, "t.js");
         assertTrue(!String.valueOf(message).contains("not available to plug-in scripts"), String.valueOf(message));
+    }
+
+    @Test
+    void javaExtendSubclassesAllowedTypes() throws ScriptException {
+        assertEquals(3, eval("""
+                const Sub = Java.extend(Java.type('java.util.AbstractList'), {
+                    get(i) { return i; },
+                    size() { return 3; }
+                });
+                new Sub().size()
+                """, "t.js"));
+    }
+
+    @Test
+    void javaExtendRejectsOtherTypes() {
+        ScriptException e = assertThrows(ScriptException.class,
+                () -> moduleResult("return Java.extend(Inherited, {});"));
+        assertTrue(e.getMessage().contains("not a Java type"), e.getMessage());
+    }
+
+    @Test
+    void javaExtendAcceptsExtensibleFacades() throws ScriptException {
+        assertEquals(2, moduleResult("""
+                const Sub = Java.extend(Extensible, { size() { return 2; }, get(i) { return i; } });
+                return new Sub().size();
+                """));
     }
 
     @Test
@@ -145,6 +175,58 @@ class HostBoundaryTest {
     }
 
     @Test
+    void numbersTruncateToIntAndLongParameters() throws ScriptException {
+        assertEquals("1 -2 3 4 9", eval("""
+                const r = new (Java.type('java.awt.Rectangle'))(1.9, -2.7, 3.5, 4);
+                r.width = 3.99;
+                r.height = 4.01;
+                `${r.x} ${r.y} ${r.width} ${r.height} ${r.x + 8}`""", "t.js"));
+        assertEquals(2000L, ((Number) eval(
+                "Java.type('java.util.concurrent.TimeUnit').SECONDS.toMillis(2.9)", "t.js")).longValue());
+    }
+
+    @Test
+    void fractionsPreferFloatOverloadsAndWholeNumbersInt() throws ScriptException {
+        assertEquals("64 84 112 255 0 1", eval("""
+                const Color = Java.type('java.awt.Color');
+                const a = new Color(0.25, 0.33, 0.44);
+                const b = new Color(255, 0, 1);
+                [a.getRed(), a.getGreen(), a.getBlue(), b.getRed(), b.getGreen(), b.getBlue()].join(' ')""",
+                "t.js"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"NaN", "Infinity", "-Infinity", "3e9", "-3e9", "null", "undefined"})
+    void numbersOutsideIntRangeAreRejected(String n) {
+        assertThrows(ScriptException.class,
+                () -> eval("new (Java.type('java.awt.Rectangle'))(" + n + ", 0, 1, 1)", "t.js"));
+    }
+
+    @Test
+    void integerRangeIsCheckedAfterTruncation() {
+        assertTrue(GraalJSSession.fitsInteger(2147483647.9, Integer.MIN_VALUE, Integer.MAX_VALUE));
+        assertTrue(GraalJSSession.fitsInteger(-2147483648.9, Integer.MIN_VALUE, Integer.MAX_VALUE));
+        assertFalse(GraalJSSession.fitsInteger(2147483648.0, Integer.MIN_VALUE, Integer.MAX_VALUE));
+        assertFalse(GraalJSSession.fitsInteger(Double.NaN, Long.MIN_VALUE, Long.MAX_VALUE));
+        assertFalse(GraalJSSession.fitsInteger(null, Integer.MIN_VALUE, Integer.MAX_VALUE));
+    }
+
+    @Test
+    void numbersBecomeStringParametersAsScriptText() throws ScriptException {
+        assertEquals("7 1.5 1e+21", eval("""
+                const F = Java.type('java.io.File');
+                [7, 1.5, 1e21].map((n) => new F(n).getPath()).join(' ')""", "t.js"));
+        assertEquals(7, eval("Java.type('java.lang.Integer').valueOf(7)", "t.js"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(doubles = {0, -0.0, 7, -0.5, 1.5e10, 123456789012345680000.0, 1e21, -1.25e22,
+            1e-6, 1e-7, 1.5e-8, 0.1, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY})
+    void numberTextMatchesScriptConversion(double d) throws ScriptException {
+        assertEquals(eval("String(" + d + ")", "t.js"), GraalJSSession.numberText(d));
+    }
+
+    @Test
     void javaGlobalCannotBeReplacedOrExtended() {
         assertThrows(ScriptException.class,
                 () -> eval("Object.defineProperty(globalThis, 'Java', { value: 1 })", "t.js"));
@@ -153,7 +235,6 @@ class HostBoundaryTest {
 
     @Test
     void javaGlobalOmitsClassLoadingFunctions() throws ScriptException {
-        assertEquals("undefined", eval("typeof Java.extend + ''", "t.js"));
         assertEquals("undefined", eval("typeof Java.addToClasspath + ''", "t.js"));
     }
 

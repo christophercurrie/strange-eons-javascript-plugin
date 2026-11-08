@@ -102,6 +102,16 @@ export const StrangeImage = facade("resources.StrangeImage", {
         "identifierToURL", "isFileIdentifier"
     ]
 });
+export const Preferences = facade("ca.cgjennings.apps.arkham.dialog.prefs.Preferences", {
+    methods: [
+        "addPreferenceUpdateListener", "firePreferenceUpdate", "registerCategory",
+        "removePreferenceUpdateListener", "unregisterCategory"
+    ]
+});
+export const FillInPreferenceCategory = facade("ca.cgjennings.apps.arkham.dialog.prefs.FillInPreferenceCategory", {
+    constructible: true,
+    extensible: true
+});
 export const Font = Java.type("java.awt.Font");
 export const URL = Java.type("java.net.URL");
 
